@@ -1,0 +1,15 @@
+node_modules
+.env
+.env.local
+.DS_Store
+*.log
+dist
+AirbnbReferralApp
+docs
+wireframes
+*.md
+!VERCEL_DEPLOYMENT.md
+start-all.js
+start-all.sh
+share-with-client.sh
+

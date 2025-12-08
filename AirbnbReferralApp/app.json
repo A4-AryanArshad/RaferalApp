@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "AirbnbReferralApp",
+    "slug": "AirbnbReferralApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.airbnbreferral.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à vos photos pour ajouter des images à vos annonces.",
+        "NSPhotoLibraryAddUsageDescription": "Cette application a besoin d'accéder à vos photos pour ajouter des images à vos annonces."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "scheme": "airbnbreferral"
+  }
+}
