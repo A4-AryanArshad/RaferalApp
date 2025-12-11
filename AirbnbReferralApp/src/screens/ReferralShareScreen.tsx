@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import {referralService, Referral} from '../services/referralService';
+import {listingService, Listing} from '../services/listingService';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import {Ionicons} from '@expo/vector-icons';
@@ -19,7 +20,9 @@ const ReferralShareScreen = () => {
   const navigation = useNavigation();
   const {referralId} = route.params as {referralId: string};
   const [referral, setReferral] = useState<Referral | null>(null);
+  const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
+  const [listingLoading, setListingLoading] = useState(false);
 
   useEffect(() => {
     const fetchReferral = async () => {
@@ -31,6 +34,27 @@ const ReferralShareScreen = () => {
       try {
         const data = await referralService.getReferral(referralId);
         setReferral(data);
+        
+        // Fetch listing if listingId exists
+        if (data.listingId) {
+          setListingLoading(true);
+          try {
+            const listingData = await listingService.getListing(data.listingId);
+            console.log('Listing fetched:', listingData);
+            console.log('Airbnb URL:', listingData.airbnbListingUrl);
+            setListing(listingData);
+          } catch (error: any) {
+            console.error('Error fetching listing:', error);
+            console.error('Error details:', error.response?.data || error.message);
+            setListing(null);
+            // Don't show error, just continue without listing
+          } finally {
+            setListingLoading(false);
+          }
+        } else {
+          console.log('No listingId in referral');
+          setListingLoading(false);
+        }
       } catch (error: any) {
         console.error('Error fetching referral:', error);
         const errorMessage = error.response?.data?.error || error.message || 'Erreur lors du chargement du lien';
@@ -48,16 +72,23 @@ const ReferralShareScreen = () => {
   }, [referralId, navigation]);
 
   const copyToClipboard = async () => {
-    if (referral) {
-      await Clipboard.setStringAsync(referral.referralLink);
+    // Only copy the user-entered link, not the generated referral link
+    if (listing?.airbnbListingUrl) {
+      await Clipboard.setStringAsync(listing.airbnbListingUrl);
       Alert.alert('Copié!', 'Lien copié dans le presse-papiers');
+    } else {
+      Alert.alert('Erreur', 'Aucun lien à copier');
     }
   };
 
   const handleShare = async (method: string) => {
     if (!referral) return;
 
-    const message = `Découvrez cette location Airbnb: ${referral.referralLink}`;
+    // Only share the user-entered link, not the generated referral link
+    if (!listing?.airbnbListingUrl) {
+      Alert.alert('Erreur', 'Aucun lien à partager');
+      return;
+    }
 
     try {
       if (method === 'copy') {
@@ -102,15 +133,26 @@ const ReferralShareScreen = () => {
 
         <View style={styles.linkSection}>
           <Text style={styles.linkLabel}>Lien de partage:</Text>
-          <View style={styles.linkContainer}>
-            <Text style={styles.linkText} numberOfLines={1}>
-              {referral.referralLink}
+          {listingLoading ? (
+            <View style={styles.linkContainer}>
+              <ActivityIndicator size="small" color="#FF5A5F" />
+              <Text style={styles.loadingText}>Chargement du lien...</Text>
+            </View>
+          ) : listing?.airbnbListingUrl ? (
+            <View style={styles.linkContainer}>
+              <Text style={styles.linkText} numberOfLines={1}>
+                {listing.airbnbListingUrl}
+              </Text>
+              <TouchableOpacity style={styles.copyButton} onPress={copyToClipboard}>
+                <Ionicons name="copy" size={16} color="#FFFFFF" style={{marginRight: 5}} />
+                <Text style={styles.copyButtonText}>Copier</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={styles.noLinkText}>
+              Aucun lien Airbnb n'a été fourni pour cette annonce
             </Text>
-            <TouchableOpacity style={styles.copyButton} onPress={copyToClipboard}>
-              <Ionicons name="copy" size={16} color="#FFFFFF" style={{marginRight: 5}} />
-              <Text style={styles.copyButtonText}>Copier</Text>
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
 
         <View style={styles.statsRow}>
@@ -233,6 +275,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F7F7',
     padding: 10,
     borderRadius: 8,
+  },
+  noLinkText: {
+    fontSize: 14,
+    color: '#999999',
+    fontStyle: 'italic',
+    padding: 10,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: '#717171',
+    marginLeft: 10,
   },
   copyButton: {
     backgroundColor: '#FF5A5F',

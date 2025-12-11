@@ -10,13 +10,13 @@ import {
   Image,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {useAuth} from '../contexts/AuthContext';
+import {useAuthState} from '../hooks/useAuthState';
 import {referralService, ReferralStats} from '../services/referralService';
 import {listingService, Listing} from '../services/listingService';
 import {Ionicons} from '@expo/vector-icons';
 
 const DashboardScreen = () => {
-  const {user, isAuthenticated} = useAuth();
+  const {user, isAuthenticated} = useAuthState();
   const navigation = useNavigation();
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);

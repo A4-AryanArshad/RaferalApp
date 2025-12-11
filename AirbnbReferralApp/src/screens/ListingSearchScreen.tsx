@@ -130,11 +130,14 @@ const ListingSearchScreen = () => {
                   key={listing._id}
                   style={styles.listingCard}
                   onPress={() => navigation.navigate('ListingDetail', {id: listing._id} as never)}>
-                  {listing.images && listing.images.length > 0 ? (
+                  {listing.images && listing.images.length > 0 && listing.images[0] && listing.images[0].trim() !== '' ? (
                     <Image
                       source={{uri: listing.images[0]}}
                       style={styles.listingImage}
                       resizeMode="cover"
+                      onError={(error) => {
+                        console.log('Image load error:', error.nativeEvent.error);
+                      }}
                     />
                   ) : (
                     <View style={styles.noImageContainer}>

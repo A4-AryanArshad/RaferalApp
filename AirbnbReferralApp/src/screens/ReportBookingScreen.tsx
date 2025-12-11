@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {useAuthState} from '../hooks/useAuthState';
 import {useAuth} from '../contexts/AuthContext';
 import api from '../services/api';
 import {Ionicons} from '@expo/vector-icons';
@@ -20,7 +21,8 @@ const ReportBookingScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const {referralCode} = route.params as {referralCode?: string};
-  const {user, isAuthenticated} = useAuth();
+  const {user, isAuthenticated} = useAuthState();
+  const {logout} = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     referralCode: referralCode || '',
@@ -68,7 +70,10 @@ const ReportBookingScreen = () => {
           {text: 'Annuler', style: 'cancel'},
           {
             text: 'Se connecter',
-            onPress: () => navigation.navigate('Login' as never),
+            onPress: async () => {
+              // Logout will automatically show the Login screen
+              await logout();
+            },
           },
         ],
       );
@@ -133,7 +138,7 @@ const ReportBookingScreen = () => {
             value={formData.referralCode}
             onChangeText={value => handleChange('referralCode', value.toUpperCase())}
             autoCapitalize="characters"
-            editable={!loading && !referralCode}
+            editable={loading === false && (referralCode === undefined || referralCode === '') ? true : false}
             placeholderTextColor="#999"
           />
 

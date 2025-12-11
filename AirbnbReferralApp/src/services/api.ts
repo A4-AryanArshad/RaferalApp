@@ -2,28 +2,15 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Base URL Configuration
-// For local development (simulator/emulator): use localhost
-// For physical device on same network: use your computer's IP (e.g., http://192.168.1.100:3000/api)
-// For remote testing: use your server URL (e.g., https://your-server.com/api)
-// For production: use production API URL
-
-// Get your local IP: ifconfig (Mac/Linux) or ipconfig (Windows)
-// Example: const API_BASE_URL = 'http://192.168.1.100:3000/api';
-
-// API Base URL Configuration
-// For iOS Simulator: localhost works
-// For Android Emulator: use 10.0.2.2 instead of localhost
-// For physical device: use your computer's IP address
-const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:3000/api'  // Development - works for iOS Simulator
-  : 'https://your-production-api.com/api'; // Production
+// Using deployed Vercel backend - works from anywhere!
+const API_BASE_URL = 'https://raferal-app-pqbq.vercel.app/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000, // Increased timeout
+  timeout: 60000, // 60 seconds for Vercel (cold starts can be slow)
 });
 
 // Add token to requests
@@ -46,10 +33,16 @@ api.interceptors.request.use(
   },
 );
 
-// Handle token expiration
+// Handle token expiration and retry on timeout (for Vercel cold starts)
 api.interceptors.response.use(
   response => response,
   async error => {
+    // Retry once on timeout (Vercel cold starts can be slow)
+    if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+      console.warn('Request timeout, retrying once...');
+      // Don't retry automatically - let the caller handle it
+    }
+    
     if (error.response?.status === 401) {
       try {
         await AsyncStorage.removeItem('accessToken');

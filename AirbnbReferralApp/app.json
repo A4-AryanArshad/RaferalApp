@@ -20,8 +20,11 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.airbnbreferral.app",
+      "jsEngine": "jsc"
     },
+    "jsEngine": "jsc",
     "web": {
       "favicon": "./assets/favicon.png"
     },

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {createStackNavigator} from '@react-navigation/stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {useAuth} from '../contexts/AuthContext';
+import {getGlobalUser, subscribeToUser} from '../store/authStore';
+import {User} from '../services/authService';
 import {ActivityIndicator, View, Text, StyleSheet} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 
@@ -34,10 +35,10 @@ const LoadingScreen = () => (
 const MainTabs = () => {
   return (
     <Tab.Navigator
-      screenOptions={{
+        screenOptions={{
         tabBarActiveTintColor: '#FF5A5F',
         tabBarInactiveTintColor: '#717171',
-        headerShown: true,
+        headerShown: true as boolean,
         headerStyle: {
           backgroundColor: '#FFFFFF',
         },
@@ -103,70 +104,122 @@ const MainTabs = () => {
 };
 
 const AppNavigator = () => {
-  const {isAuthenticated, loading} = useAuth();
+  // CRITICAL: Use refs instead of state to avoid React Native bridge serialization
+  // Refs don't trigger re-renders through the bridge, avoiding type errors
+  const userRef = React.useRef<User | null>(getGlobalUser());
+  const [forceUpdate, setForceUpdate] = React.useState(0);
+  const [initialLoad, setInitialLoad] = React.useState<boolean>(true);
+  
+  // Subscribe to global user changes - update ref, not state
+  useEffect(() => {
+    const unsubscribe = subscribeToUser((newUser) => {
+      userRef.current = newUser;
+      // Force re-render by updating counter
+      setForceUpdate(prev => prev + 1);
+    });
+    return unsubscribe;
+  }, []);
+  
+  // Track initial load - set to false after first render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoad(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // Get user from ref (not state) - avoids serialization
+  const user = userRef.current;
+  
+  // CRITICAL: Use Object.is() to ensure strict boolean primitives
+  // This is the most reliable way to avoid Hermes serialization issues
+  const userExists = Object.is(user, null) === false && Object.is(user, undefined) === false;
+  const isAuthenticated: boolean = userExists === true ? true : false;
+  
+  const loading: boolean = Object.is(initialLoad, true) === true ? true : false;
 
-  if (loading) {
+  if (loading === true) {
     return <LoadingScreen />;
   }
 
+  // CRITICAL: Ensure headerShown is literal boolean primitive
+  const headerShownValue: boolean = false;
+  
+  // CRITICAL: Avoid ternary in JSX - use if/else to render different navigators
+  // This prevents any boolean serialization issues in JSX
+  
+  if (loading === true) {
+    return <LoadingScreen />;
+  }
+  
+  if (isAuthenticated === false) {
+    return (
+      <Stack.Navigator>
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Signup" component={SignupScreen} />
+        <Stack.Screen
+          name="ReferralLanding"
+          component={ReferralLandingScreen}
+          options={{
+            headerShown: true as boolean,
+            title: 'Recommandation',
+            headerStyle: {backgroundColor: '#FF5A5F'},
+            headerTintColor: '#FFFFFF',
+          }}
+        />
+      </Stack.Navigator>
+    );
+  }
+  
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
-      {!isAuthenticated ? (
-        <>
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Signup" component={SignupScreen} />
-        </>
-      ) : (
-        <>
-          <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen
-            name="ListingDetail"
-            component={ListingDetailScreen}
-            options={{
-              headerShown: true,
-              title: 'Détails de la location',
-              headerStyle: {backgroundColor: '#FFFFFF'},
-              headerTintColor: '#222222',
-            }}
-          />
-          <Stack.Screen
-            name="ReferralShare"
-            component={ReferralShareScreen}
-            options={{
-              headerShown: true,
-              title: 'Partager',
-              headerStyle: {backgroundColor: '#FFFFFF'},
-              headerTintColor: '#222222',
-            }}
-          />
-          <Stack.Screen
-            name="CreateListing"
-            component={CreateListingScreen}
-            options={{
-              headerShown: true,
-              title: 'Créer une annonce',
-              headerStyle: {backgroundColor: '#FFFFFF'},
-              headerTintColor: '#222222',
-            }}
-          />
-          <Stack.Screen
-            name="ReportBooking"
-            component={ReportBookingScreen}
-            options={{
-              headerShown: true,
-              title: 'Signaler une réservation',
-              headerStyle: {backgroundColor: '#FFFFFF'},
-              headerTintColor: '#222222',
-            }}
-          />
-        </>
-      )}
+    <Stack.Navigator screenOptions={{headerShown: headerShownValue}}>
+      <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen
+        name="ListingDetail"
+        component={ListingDetailScreen}
+        options={{
+          headerShown: true as boolean,
+          title: 'Détails de la location',
+          headerStyle: {backgroundColor: '#FFFFFF'},
+          headerTintColor: '#222222',
+        }}
+      />
+      <Stack.Screen
+        name="ReferralShare"
+        component={ReferralShareScreen}
+        options={{
+          headerShown: true as boolean,
+          title: 'Partager',
+          headerStyle: {backgroundColor: '#FFFFFF'},
+          headerTintColor: '#222222',
+        }}
+      />
+      <Stack.Screen
+        name="CreateListing"
+        component={CreateListingScreen}
+        options={{
+          headerShown: true as boolean,
+          title: 'Créer une annonce',
+          headerStyle: {backgroundColor: '#FFFFFF'},
+          headerTintColor: '#222222',
+        }}
+      />
+      <Stack.Screen
+        name="ReportBooking"
+        component={ReportBookingScreen}
+        options={{
+          headerShown: true as boolean,
+          title: 'Signaler une réservation',
+          headerStyle: {backgroundColor: '#FFFFFF'},
+          headerTintColor: '#222222',
+        }}
+      />
       {/* Public screens - accessible without auth */}
       <Stack.Screen
         name="ReferralLanding"
         component={ReferralLandingScreen}
         options={{
-          headerShown: true,
+          headerShown: true as boolean,
           title: 'Recommandation',
           headerStyle: {backgroundColor: '#FF5A5F'},
           headerTintColor: '#FFFFFF',

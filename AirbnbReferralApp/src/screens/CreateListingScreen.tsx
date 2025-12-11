@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import {listingService} from '../services/listingService';
 import {Ionicons} from '@expo/vector-icons';
 import {Linking} from 'react-native';
@@ -58,7 +59,7 @@ const CreateListingScreen = () => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
-        quality: 0.8,
+        quality: 0.5, // Lower quality to reduce base64 size
         allowsEditing: false,
       });
 
@@ -76,6 +77,25 @@ const CreateListingScreen = () => {
     setImages(newImages);
   };
 
+  const convertImageToBase64 = async (uri: string): Promise<string> => {
+    try {
+      // If already a data URI or HTTP URL, return as is
+      if (uri.startsWith('data:') || uri.startsWith('http://') || uri.startsWith('https://')) {
+        return uri;
+      }
+      
+      // Convert local file to base64
+      // expo-file-system v19+ uses string 'base64', not EncodingType enum
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: 'base64',
+      });
+      return `data:image/jpeg;base64,${base64}`;
+    } catch (error) {
+      console.error('Error converting image to base64:', error);
+      return uri; // Return original if conversion fails
+    }
+  };
+
   const handleSubmit = async () => {
     if (
       !formData.title ||
@@ -91,6 +111,11 @@ const CreateListingScreen = () => {
 
     setLoading(true);
     try {
+      // Convert local image URIs to base64 data URIs
+      const convertedImages = await Promise.all(
+        images.map(img => convertImageToBase64(img))
+      );
+
       const listing = await listingService.createListing({
         title: formData.title,
         description: formData.description,
@@ -104,7 +129,7 @@ const CreateListingScreen = () => {
         amenities: formData.amenities
           ? formData.amenities.split(',').map(a => a.trim())
           : [],
-        images: images, // Send image URIs (in production, upload to cloud storage first)
+        images: convertedImages, // Send as base64 data URIs
         airbnbListingUrl: formData.airbnbListingUrl || undefined,
       });
 
@@ -115,6 +140,10 @@ const CreateListingScreen = () => {
         },
       ]);
     } catch (error: any) {
+      console.error('Error creating listing:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error message:', error.message);
+      
       let errorMessage = 'Échec de la création';
       if (error.response?.data) {
         if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
@@ -124,7 +153,11 @@ const CreateListingScreen = () => {
         } else if (error.response.data.error) {
           errorMessage = error.response.data.error;
         }
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+      
+      // Show detailed error for debugging
       Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
