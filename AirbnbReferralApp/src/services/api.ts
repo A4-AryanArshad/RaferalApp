@@ -2,15 +2,15 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Base URL Configuration
-// Using deployed Vercel backend - works from anywhere!
-const API_BASE_URL = 'https://raferal-app-pqbq.vercel.app/api';
+// Using deployed Vercel backend
+const API_BASE_URL = 'https://raferal-app-pqbq.vercel.app/api';  // Production Vercel backend
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 60000, // 60 seconds for Vercel (cold starts can be slow)
+  timeout: 60000, // 60 seconds timeout
 });
 
 // Add token to requests

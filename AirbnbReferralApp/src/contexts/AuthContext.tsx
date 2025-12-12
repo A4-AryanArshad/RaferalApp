@@ -79,12 +79,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({children}) => {
           // Ignore storage errors
         }
       } finally {
+        // Always set loading to false, even if there's an error
         setLoading(false);
         setGlobalLoading(false);
       }
     };
 
-    initAuth();
+    // Add a small delay to ensure app is fully initialized
+    const timer = setTimeout(() => {
+      initAuth().catch(err => {
+        console.warn('Failed to initialize auth:', err);
+        setLoading(false);
+        setGlobalLoading(false);
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

@@ -4,8 +4,10 @@
     "slug": "AirbnbReferralApp",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -13,21 +15,36 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.airbnbreferral.app",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à vos photos pour ajouter des images à vos annonces.",
-        "NSPhotoLibraryAddUsageDescription": "Cette application a besoin d'accéder à vos photos pour ajouter des images à vos annonces."
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select images for listings.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs access to save images to your photo library."
       }
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.airbnbreferral.app",
-      "jsEngine": "jsc"
+      "permissions": [
+        "INTERNET",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ],
+      "jsEngine": "hermes",
+      "usesCleartextTraffic": false,
+      "allowBackup": true
     },
-    "jsEngine": "jsc",
+    "jsEngine": "hermes",
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "airbnbreferral"
+    "scheme": "airbnbreferral",
+    "extra": {
+      "eas": {
+        "projectId": "de5de2dc-eb26-461a-8554-63f30f5679ce"
+      }
+    }
   }
 }

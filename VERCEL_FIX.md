@@ -32,3 +32,8 @@ vercel --prod
 2. Make sure all files are committed
 3. Try: `vercel --prod --force`
 
+
+
+
+
+

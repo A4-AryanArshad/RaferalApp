@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { connectDatabase } from './config/database';
@@ -14,11 +17,14 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: CORS_ORIGIN,
+  origin: '*', // Allow all origins for local development
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase body size limit for base64 images (50MB)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
@@ -54,11 +60,12 @@ const startServer = async () => {
     // Connect to database
     await connectDatabase();
 
-    // Start listening
-    app.listen(PORT, () => {
+    // Start listening on all interfaces (0.0.0.0) so mobile devices can connect
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📝 Environment: ${NODE_ENV}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+      console.log(`📱 Mobile access: http://192.168.1.7:${PORT}/api`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

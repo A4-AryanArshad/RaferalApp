@@ -35,7 +35,7 @@ const LoginScreen = () => {
       
       // Handle network errors
       if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
-        errorMessage = 'Impossible de se connecter au serveur. Vérifiez que le serveur est démarré sur http://localhost:3000';
+        errorMessage = 'Impossible de se connecter au serveur. Vérifiez votre connexion réseau (backend déployé : https://raferal-app-pqbq.vercel.app/api)';
       } else if (error.response?.data) {
         if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
           errorMessage = error.response.data.errors

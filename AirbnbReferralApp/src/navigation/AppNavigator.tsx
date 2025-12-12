@@ -148,10 +148,6 @@ const AppNavigator = () => {
   // CRITICAL: Avoid ternary in JSX - use if/else to render different navigators
   // This prevents any boolean serialization issues in JSX
   
-  if (loading === true) {
-    return <LoadingScreen />;
-  }
-  
   if (isAuthenticated === false) {
     return (
       <Stack.Navigator>

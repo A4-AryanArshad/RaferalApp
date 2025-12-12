@@ -1,4 +1,5 @@
 import { Listing, IListing } from '../models/Listing';
+import { uploadImagesToCloudinary } from '../utils/cloudinary';
 
 export interface CreateListingData {
   hostId: string;
@@ -35,8 +36,40 @@ export class ListingService {
    * Create a new listing
    */
   static async createListing(data: CreateListingData): Promise<IListing> {
+    let imageUrls: string[] = [];
+
+    // Upload images to Cloudinary if provided
+    if (data.images && data.images.length > 0) {
+      try {
+        console.log(`📤 Uploading ${data.images.length} image(s) to Cloudinary...`);
+        
+        // Filter out any images that are already URLs (from Cloudinary)
+        const base64Images = data.images.filter(img => 
+          img.startsWith('data:') || (!img.startsWith('http://') && !img.startsWith('https://'))
+        );
+        
+        const existingUrls = data.images.filter(img => 
+          img.startsWith('http://') || img.startsWith('https://')
+        );
+
+        // Upload base64 images to Cloudinary
+        if (base64Images.length > 0) {
+          const uploadedUrls = await uploadImagesToCloudinary(base64Images);
+          imageUrls = [...existingUrls, ...uploadedUrls];
+        } else {
+          imageUrls = existingUrls;
+        }
+
+        console.log(`✅ Successfully uploaded ${imageUrls.length} image(s) to Cloudinary`);
+      } catch (error: any) {
+        console.error('❌ Error uploading images to Cloudinary:', error);
+        throw new Error(`Failed to upload images: ${error.message || 'Unknown error'}`);
+      }
+    }
+
     const listing = new Listing({
       ...data,
+      images: imageUrls.length > 0 ? imageUrls : data.images, // Use Cloudinary URLs
       status: 'active',
       reviewCount: 0,
     });
@@ -113,6 +146,35 @@ export class ListingService {
 
     if (!listing) {
       throw new Error('Listing not found or access denied');
+    }
+
+    // Handle image uploads if new images are provided
+    if (data.images && data.images.length > 0) {
+      try {
+        console.log(`📤 Uploading ${data.images.length} image(s) to Cloudinary for update...`);
+        
+        // Filter out any images that are already URLs (from Cloudinary)
+        const base64Images = data.images.filter(img => 
+          img.startsWith('data:') || (!img.startsWith('http://') && !img.startsWith('https://'))
+        );
+        
+        const existingUrls = data.images.filter(img => 
+          img.startsWith('http://') || img.startsWith('https://')
+        );
+
+        // Upload base64 images to Cloudinary
+        if (base64Images.length > 0) {
+          const uploadedUrls = await uploadImagesToCloudinary(base64Images);
+          data.images = [...existingUrls, ...uploadedUrls];
+        } else {
+          data.images = existingUrls;
+        }
+
+        console.log(`✅ Successfully uploaded images to Cloudinary`);
+      } catch (error: any) {
+        console.error('❌ Error uploading images to Cloudinary:', error);
+        throw new Error(`Failed to upload images: ${error.message || 'Unknown error'}`);
+      }
     }
 
     Object.assign(listing, data);

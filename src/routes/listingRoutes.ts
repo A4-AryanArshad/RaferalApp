@@ -22,30 +22,65 @@ router.post(
     body('currency').optional().trim(),
     body('images').optional().isArray(),
     body('amenities').optional().isArray(),
-    body('airbnbListingUrl').optional().isURL().withMessage('Invalid Airbnb URL'),
+    body('airbnbListingUrl').optional().trim().custom((value) => {
+      if (!value) return true; // Optional field
+      // Allow any URL format (including YouTube, etc.)
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }).withMessage('Invalid URL format'),
   ],
   async (req: AuthRequest, res: Response) => {
     try {
+      console.log('📝 Creating listing...');
+      console.log('Request body keys:', Object.keys(req.body));
+      console.log('Images count:', req.body.images?.length || 0);
+      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.error('❌ Validation errors:', errors.array());
         return res.status(400).json({ errors: errors.array() });
       }
 
       if (!req.user) {
+        console.error('❌ Unauthorized: No user in request');
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
+      console.log('✅ Creating listing for user:', req.user.userId);
       const listing = await ListingService.createListing({
         hostId: req.user.userId,
         ...req.body,
       });
 
+      console.log('✅ Listing created successfully:', listing._id);
       res.status(201).json({
         message: 'Listing created successfully',
         listing,
       });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to create listing' });
+      console.error('❌ Error creating listing:', error);
+      console.error('Error stack:', error.stack);
+      
+      // Provide more specific error messages
+      let statusCode = 500;
+      let errorMessage = 'Failed to create listing';
+      
+      if (error.message) {
+        errorMessage = error.message;
+        // Check if it's a Cloudinary error
+        if (error.message.includes('Cloudinary') || error.message.includes('upload')) {
+          statusCode = 400; // Bad request for upload errors
+        }
+      }
+      
+      res.status(statusCode).json({ 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
   }
 );
