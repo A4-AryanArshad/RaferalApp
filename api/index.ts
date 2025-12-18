@@ -1,4 +1,3 @@
-// Environment variables are now hardcoded for APK distribution
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { connectDatabase } from '../src/config/database';
@@ -11,11 +10,11 @@ import bookingRoutes from '../src/routes/bookingRoutes';
 import webhookRoutes from '../src/routes/webhookRoutes';
 import hostRoutes from '../src/routes/hostRoutes';
 
+const app = express();
+
 // Hardcoded configuration
 const CORS_ORIGIN = '*'; // Allow all origins
 const NODE_ENV = 'production';
-
-const app = express();
 
 // Middleware
 app.use(cors({
@@ -65,7 +64,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err);
   res.status(500).json({
     error: 'Internal server error',
-    message: false ? err.message : undefined, // Hardcoded: no error messages in production
+    message: undefined, // Don't expose error details in production
   });
 });
 
@@ -82,3 +81,4 @@ export default async function handler(req: Request, res: Response) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
