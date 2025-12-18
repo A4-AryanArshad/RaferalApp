@@ -1,5 +1,6 @@
 import { Listing, IListing } from '../models/Listing';
 import mongoose from 'mongoose';
+import { CloudinaryUploadResult } from './cloudinaryService';
 
 export interface CreateListingData {
   hostId: string;
@@ -66,7 +67,7 @@ export class ListingService {
           const uploadStartTime = Date.now();
           const uploadResults = await CloudinaryService.uploadMultipleBase64(imageUrls);
           const uploadTime = Date.now() - uploadStartTime;
-          imageUrls = uploadResults.map(result => result.secure_url);
+          imageUrls = uploadResults.map((result: CloudinaryUploadResult) => result.secure_url);
           console.log(`[ListingService] Images uploaded successfully in ${uploadTime}ms, using URLs instead of base64`);
         } catch (error: any) {
           console.error(`[ListingService] Cloudinary upload failed:`, error.message);
