@@ -46,14 +46,14 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // API Routes
-app.use('../src/api/users', userRoutes);
-app.use('../src/api/referrals', referralRoutes);
-app.use('../src/api/listings', listingRoutes);
-app.use('../src/api/rewards', rewardRoutes);
-app.use('../src/api/payments', paymentRoutes);
-app.use('../src/api/bookings', bookingRoutes);
-app.use('../src/api/webhooks', webhookRoutes);
-app.use('../src/api/host', hostRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/listings', listingRoutes);
+app.use('/api/rewards', rewardRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/host', hostRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
