@@ -146,6 +146,14 @@ router.get(
       }
 
       const { status, confirmationStatus } = req.query;
+      
+      // Log query parameters for debugging
+      console.log('[ReferralRoutes] GET /user/:userId - Query params:', {
+        status,
+        confirmationStatus,
+        userId: req.params.userId,
+        allQuery: req.query,
+      });
 
       const referrals = await ReferralService.getUserReferrals(
         req.params.userId,
@@ -153,6 +161,7 @@ router.get(
         confirmationStatus as 'pending_host_confirmation' | 'host_confirmed' | undefined
       );
 
+      console.log('[ReferralRoutes] Returning referrals:', referrals.length);
       res.json({ referrals });
     } catch (error: any) {
       console.error('Error fetching user referrals:', error);

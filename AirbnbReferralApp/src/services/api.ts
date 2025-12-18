@@ -17,6 +17,11 @@ const api = axios.create({
 api.interceptors.request.use(
   async config => {
     try {
+      // Disable caching for all requests
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      config.headers['Pragma'] = 'no-cache';
+      config.headers['Expires'] = '0';
+      
       // Public endpoints don't need tokens
       const url = config.url || '';
       const isPublicEndpoint = url.includes('/listings/search') || 
