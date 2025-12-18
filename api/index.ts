@@ -1,3 +1,4 @@
+// Environment variables are now hardcoded for APK distribution
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { connectDatabase } from '../src/config/database';
@@ -10,11 +11,11 @@ import bookingRoutes from '../src/routes/bookingRoutes';
 import webhookRoutes from '../src/routes/webhookRoutes';
 import hostRoutes from '../src/routes/hostRoutes';
 
-const app = express();
-
 // Hardcoded configuration
 const CORS_ORIGIN = '*'; // Allow all origins
 const NODE_ENV = 'production';
+
+const app = express();
 
 // Middleware
 app.use(cors({
@@ -45,14 +46,14 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // API Routes
-app.use('/api/users', userRoutes);
-app.use('/api/referrals', referralRoutes);
-app.use('/api/listings', listingRoutes);
-app.use('/api/rewards', rewardRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/webhooks', webhookRoutes);
-app.use('/api/host', hostRoutes);
+app.use('../src/api/users', userRoutes);
+app.use('../src/api/referrals', referralRoutes);
+app.use('../src/api/listings', listingRoutes);
+app.use('../src/api/rewards', rewardRoutes);
+app.use('../src/api/payments', paymentRoutes);
+app.use('../src/api/bookings', bookingRoutes);
+app.use('../src/api/webhooks', webhookRoutes);
+app.use('../src/api/host', hostRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -64,7 +65,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err);
   res.status(500).json({
     error: 'Internal server error',
-    message: undefined, // Don't expose error details in production
+    message: false ? err.message : undefined, // Hardcoded: no error messages in production
   });
 });
 
@@ -81,4 +82,3 @@ export default async function handler(req: Request, res: Response) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
-

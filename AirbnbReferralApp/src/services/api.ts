@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Base URL Configuration - Hardcoded for APK distribution
-// Using deployed production server
+// Using deployed production server (production URL, not preview)
 const API_BASE_URL = 'https://raferal-app-pqbq.vercel.app/api';
 
 const api = axios.create({

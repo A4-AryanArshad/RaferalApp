@@ -46,14 +46,27 @@ export const referralService = {
   getUserReferrals: async (userId: string, status?: string, confirmationStatus?: 'pending_host_confirmation' | 'host_confirmed'): Promise<Referral[]> => {
     const params = new URLSearchParams();
     if (status) params.append('status', status);
-    if (confirmationStatus) params.append('confirmationStatus', confirmationStatus);
+    if (confirmationStatus) {
+      params.append('confirmationStatus', confirmationStatus);
+      console.log('[ReferralService] Adding confirmationStatus filter:', confirmationStatus);
+    }
+    // Add cache-busting timestamp to prevent 304 responses
+    params.append('_t', Date.now().toString());
     const queryString = params.toString();
-    const url = queryString
-      ? `/referrals/user/${userId}?${queryString}`
-      : `/referrals/user/${userId}`;
+    const url = `/referrals/user/${userId}?${queryString}`;
     console.log('[ReferralService] Fetching referrals from:', url);
+    console.log('[ReferralService] Full URL params:', {
+      status,
+      confirmationStatus,
+      userId,
+      queryString
+    });
     const response = await api.get(url);
+    console.log('[ReferralService] Response status:', response.status);
     console.log('[ReferralService] Received referrals:', response.data.referrals?.length || 0);
+    if (response.data.referrals && response.data.referrals.length > 0) {
+      console.log('[ReferralService] First referral confirmationStatus:', response.data.referrals[0].confirmationStatus);
+    }
     return response.data.referrals;
   },
 
