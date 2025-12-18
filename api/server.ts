@@ -1,15 +1,15 @@
 // Environment variables are now hardcoded for APK distribution
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { connectDatabase } from './config/database';
-import userRoutes from './routes/userRoutes';
-import referralRoutes from './routes/referralRoutes';
-import listingRoutes from './routes/listingRoutes';
-import rewardRoutes from './routes/rewardRoutes';
-import paymentRoutes from './routes/paymentRoutes';
-import bookingRoutes from './routes/bookingRoutes';
-import webhookRoutes from './routes/webhookRoutes';
-import hostRoutes from './routes/hostRoutes';
+import { connectDatabase } from '../src/config/database';
+import userRoutes from '../src/routes/userRoutes';
+import referralRoutes from '../src/routes/referralRoutes';
+import listingRoutes from '../src/routes/listingRoutes';
+import rewardRoutes from '../src/routes/rewardRoutes';
+import paymentRoutes from '../src/routes/paymentRoutes';
+import bookingRoutes from '../src/routes/bookingRoutes';
+import webhookRoutes from '../src/routes/webhookRoutes';
+import hostRoutes from '../src/routes/hostRoutes';
 
 // Hardcoded configuration
 const PORT = 3000;
