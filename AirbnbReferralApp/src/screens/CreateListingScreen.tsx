@@ -116,7 +116,8 @@ const CreateListingScreen = () => {
         images.map(img => convertImageToBase64(img))
       );
 
-      const listing = await listingService.createListing({
+      // Prepare listing data
+      const listingData: any = {
         title: formData.title,
         description: formData.description,
         location: {
@@ -125,18 +126,27 @@ const CreateListingScreen = () => {
           address: formData.address,
         },
         pricePerNight: parseFloat(formData.pricePerNight),
-        currency: formData.currency,
+        currency: formData.currency || 'EUR',
         amenities: formData.amenities
-          ? formData.amenities.split(',').map(a => a.trim())
+          ? formData.amenities.split(',').map(a => a.trim()).filter(a => a.length > 0)
           : [],
         images: convertedImages, // Send as base64 data URIs
-        airbnbListingUrl: formData.airbnbListingUrl || undefined,
-      });
+      };
+
+      // Only include airbnbListingUrl if it's not empty
+      if (formData.airbnbListingUrl && formData.airbnbListingUrl.trim().length > 0) {
+        listingData.airbnbListingUrl = formData.airbnbListingUrl.trim();
+      }
+
+      const listing = await listingService.createListing(listingData);
 
       Alert.alert('Succès', 'Annonce créée avec succès!', [
         {
           text: 'OK',
-          onPress: () => navigation.goBack(),
+          onPress: () => {
+            // Navigate back and the dashboard will auto-refresh on focus
+            navigation.goBack();
+          },
         },
       ]);
     } catch (error: any) {

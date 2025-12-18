@@ -7,6 +7,7 @@ export interface IUser extends Document {
   firstName: string;
   lastName: string;
   avatarUrl?: string;
+  role: 'user' | 'host';
   ambassadorTier: 'standard' | 'premium' | 'vip';
   verifiedAt?: Date;
   createdAt: Date;
@@ -43,6 +44,12 @@ const UserSchema: Schema = new Schema(
     },
     avatarUrl: {
       type: String,
+    },
+    role: {
+      type: String,
+      enum: ['user', 'host'],
+      default: 'user',
+      index: true,
     },
     ambassadorTier: {
       type: String,

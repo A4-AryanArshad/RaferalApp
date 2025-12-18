@@ -72,6 +72,7 @@ const ReferralSchema: Schema = new Schema(
 // Indexes
 ReferralSchema.index({ userId: 1, status: 1 });
 ReferralSchema.index({ referralCode: 1 });
+ReferralSchema.index({ listingId: 1, status: 1 }); // Important for host dashboard queries
 
 export const Referral = mongoose.model<IReferral>('Referral', ReferralSchema);
 

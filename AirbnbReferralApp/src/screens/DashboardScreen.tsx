@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -9,19 +9,33 @@ import {
   RefreshControl,
   Image,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuthState} from '../hooks/useAuthState';
 import {referralService, ReferralStats} from '../services/referralService';
 import {listingService, Listing} from '../services/listingService';
+import api from '../services/api';
 import {Ionicons} from '@expo/vector-icons';
+
+interface HostDashboardStats {
+  totalListings: number;
+  activeListings: number;
+  pendingConfirmations: number;
+  confirmedBookings: number;
+  rejectedBookings: number;
+  totalRevenue: number;
+  totalCommissionsPaid: number;
+}
 
 const DashboardScreen = () => {
   const {user, isAuthenticated} = useAuthState();
   const navigation = useNavigation();
   const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [hostStats, setHostStats] = useState<HostDashboardStats | null>(null);
   const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const isHost = user?.role === 'host';
 
   const fetchStats = async () => {
     if (!isAuthenticated || !user) {
@@ -30,33 +44,89 @@ const DashboardScreen = () => {
       return;
     }
     
+    // Verify token exists before making requests
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        console.warn('[Dashboard] No access token found, user may need to log in again');
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error checking token:', error);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+    
     // Set default stats first
-    setStats({
-      totalReferrals: 0,
-      activeReferrals: 0,
-      bookedReferrals: 0,
-      completedReferrals: 0,
-      totalClicks: 0,
-      totalViews: 0,
-    });
+    if (isHost) {
+      setHostStats({
+        totalListings: 0,
+        activeListings: 0,
+        pendingConfirmations: 0,
+        confirmedBookings: 0,
+        rejectedBookings: 0,
+        totalRevenue: 0,
+        totalCommissionsPaid: 0,
+      });
+    } else {
+      setStats({
+        totalReferrals: 0,
+        activeReferrals: 0,
+        bookedReferrals: 0,
+        completedReferrals: 0,
+        totalClicks: 0,
+        totalViews: 0,
+      });
+    }
     setFeaturedListings([]);
 
     try {
-      // Fetch stats and listings separately to handle errors independently
-      try {
-        const statsData = await referralService.getStats();
-        setStats(statsData);
-      } catch (statsError: any) {
-        console.error('Failed to fetch stats:', statsError);
-        // Keep default stats
-      }
+      if (isHost) {
+        // Fetch host dashboard stats and listings in parallel for faster loading
+        // Use shorter timeout for listings to prevent blocking
+        const [statsResponse, listingsResponse] = await Promise.allSettled([
+          api.get('/host/dashboard', { timeout: 10000 }).catch(err => {
+            console.warn('[Dashboard] Stats fetch failed:', err.message);
+            return { data: null };
+          }),
+          api.get('/host/listings', { timeout: 10000 }).catch(err => {
+            console.warn('[Dashboard] Listings fetch failed:', err.message);
+            return { data: null };
+          }),
+        ]);
 
-      try {
-        const listingsData = await listingService.getFeaturedListings();
-        setFeaturedListings(listingsData);
-      } catch (listingsError: any) {
-        console.error('Failed to fetch featured listings:', listingsError);
-        // Keep empty array
+        // Process stats response
+        if (statsResponse.status === 'fulfilled' && statsResponse.value?.data?.stats) {
+          setHostStats(statsResponse.value.data.stats);
+        }
+
+        // Process listings response (non-blocking - if it fails, just show empty)
+        if (listingsResponse.status === 'fulfilled' && listingsResponse.value?.data?.listings) {
+          const listings = listingsResponse.value.data.listings.map((item: any) => item.listing);
+          console.log(`[Dashboard] Setting ${listings.length} listings`);
+          setFeaturedListings(listings);
+        } else {
+          console.warn('[Dashboard] No listings available or fetch failed');
+          setFeaturedListings([]);
+        }
+      } else {
+        // Fetch user stats and listings
+        try {
+          const statsData = await referralService.getStats();
+          setStats(statsData);
+        } catch (statsError: any) {
+          console.error('Failed to fetch stats:', statsError);
+        }
+
+        try {
+          const listingsData = await listingService.getFeaturedListings();
+          setFeaturedListings(listingsData);
+        } catch (listingsError: any) {
+          console.error('Failed to fetch featured listings:', listingsError);
+        }
       }
     } catch (error: any) {
       console.error('Failed to fetch data:', error);
@@ -73,6 +143,15 @@ const DashboardScreen = () => {
       setLoading(false);
     }
   }, [isAuthenticated, user]);
+
+  // Refresh when screen comes into focus (after creating listing, etc.)
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated && user) {
+        fetchStats();
+      }
+    }, [isAuthenticated, user])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -96,43 +175,87 @@ const DashboardScreen = () => {
       <View style={styles.header}>
         <Text style={styles.greeting}>Bienvenue, {user?.firstName}!</Text>
         <Text style={styles.subtitle}>
-          Commencez à recommander et gagnez des récompenses
+          {isHost 
+            ? 'Gérez vos annonces et confirmez les réservations'
+            : 'Commencez à recommander et gagnez des récompenses'}
         </Text>
       </View>
 
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Ionicons name="link" size={32} color="#FF5A5F" />
-          <Text style={styles.statValue}>{stats?.totalReferrals || 0}</Text>
-          <Text style={styles.statLabel}>Recommandations</Text>
-        </View>
+      {isHost ? (
+        // Host Dashboard Stats
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Ionicons name="home" size={32} color="#FF5A5F" />
+            <Text style={styles.statValue}>{hostStats?.totalListings || 0}</Text>
+            <Text style={styles.statLabel}>Annonces</Text>
+          </View>
 
-        <View style={styles.statCard}>
-          <Ionicons name="hand-left" size={32} color="#FF5A5F" />
-          <Text style={styles.statValue}>{stats?.totalClicks || 0}</Text>
-          <Text style={styles.statLabel}>Clics</Text>
-        </View>
+          <View style={styles.statCard}>
+            <Ionicons name="time" size={32} color="#FF5A5F" />
+            <Text style={styles.statValue}>{hostStats?.pendingConfirmations || 0}</Text>
+            <Text style={styles.statLabel}>En attente</Text>
+          </View>
 
-        <View style={styles.statCard}>
-          <Ionicons name="checkmark-circle" size={32} color="#FF5A5F" />
-          <Text style={styles.statValue}>{stats?.bookedReferrals || 0}</Text>
-          <Text style={styles.statLabel}>Réservations</Text>
-        </View>
+          <View style={styles.statCard}>
+            <Ionicons name="checkmark-circle" size={32} color="#FF5A5F" />
+            <Text style={styles.statValue}>{hostStats?.confirmedBookings || 0}</Text>
+            <Text style={styles.statLabel}>Confirmées</Text>
+          </View>
 
-        <View style={styles.statCard}>
-          <Ionicons name="gift" size={32} color="#FF5A5F" />
-          <Text style={styles.statValue}>{stats?.completedReferrals || 0}</Text>
-          <Text style={styles.statLabel}>Complétées</Text>
+          <View style={styles.statCard}>
+            <Ionicons name="cash" size={32} color="#FF5A5F" />
+            <Text style={styles.statValue}>${hostStats?.totalRevenue || 0}</Text>
+            <Text style={styles.statLabel}>Revenus</Text>
+          </View>
         </View>
-      </View>
+      ) : (
+        // User Dashboard Stats
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Ionicons name="link" size={32} color="#FF5A5F" />
+            <Text style={styles.statValue}>{stats?.totalReferrals || 0}</Text>
+            <Text style={styles.statLabel}>Recommandations</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Ionicons name="hand-left" size={32} color="#FF5A5F" />
+            <Text style={styles.statValue}>{stats?.totalClicks || 0}</Text>
+            <Text style={styles.statLabel}>Clics</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Ionicons name="checkmark-circle" size={32} color="#FF5A5F" />
+            <Text style={styles.statValue}>{stats?.bookedReferrals || 0}</Text>
+            <Text style={styles.statLabel}>Réservations</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Ionicons name="gift" size={32} color="#FF5A5F" />
+            <Text style={styles.statValue}>{stats?.completedReferrals || 0}</Text>
+            <Text style={styles.statLabel}>Complétées</Text>
+          </View>
+        </View>
+      )}
 
       {featuredListings.length > 0 && (
         <View style={styles.featuredSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Locations populaires</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Listings' as never)}>
-              <Text style={styles.seeAllText}>Voir tout</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>
+              {isHost ? 'Mes annonces' : 'Locations populaires'}
+            </Text>
+            {isHost ? (
+              <TouchableOpacity onPress={() => {
+                // Navigate to a screen showing all host listings
+                // For now, we'll use the search screen filtered to show only host's listings
+                alert('Fonctionnalité à venir: Voir toutes mes annonces');
+              }}>
+                <Text style={styles.seeAllText}>Voir tout</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={() => navigation.navigate('Listings' as never)}>
+                <Text style={styles.seeAllText}>Voir tout</Text>
+              </TouchableOpacity>
+            )}
           </View>
           <ScrollView
             horizontal
@@ -171,25 +294,47 @@ const DashboardScreen = () => {
         </View>
       )}
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => navigation.navigate('Listings' as never)}>
-          <Ionicons name="search" size={20} color="#FFFFFF" style={{marginRight: 8}} />
-          <Text style={styles.buttonText}>Parcourir toutes les locations</Text>
-        </TouchableOpacity>
+      {isHost ? (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => navigation.navigate('CreateListing' as never)}>
+            <Ionicons name="add-circle" size={20} color="#FFFFFF" style={{marginRight: 8}} />
+            <Text style={styles.buttonText}>Créer une annonce</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('Referrals' as never)}>
-          <Ionicons name="stats-chart" size={20} color="#222222" style={{marginRight: 8}} />
-          <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-            Mes recommandations
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() =>
+              navigation.navigate('HostConfirmations' as never)
+            }>
+            <Ionicons name="time" size={20} color="#222222" style={{marginRight: 8}} />
+            <Text style={[styles.buttonText, styles.secondaryButtonText]}>
+              Confirmations en attente ({hostStats?.pendingConfirmations || 0})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => navigation.navigate('Listings' as never)}>
+            <Ionicons name="search" size={20} color="#FFFFFF" style={{marginRight: 8}} />
+            <Text style={styles.buttonText}>Parcourir toutes les locations</Text>
+          </TouchableOpacity>
 
-      {stats?.totalReferrals === 0 && (
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => navigation.navigate('Referrals' as never)}>
+            <Ionicons name="stats-chart" size={20} color="#222222" style={{marginRight: 8}} />
+            <Text style={[styles.buttonText, styles.secondaryButtonText]}>
+              Mes recommandations
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!isHost && stats?.totalReferrals === 0 && (
         <View style={styles.emptyState}>
           <Ionicons name="rocket" size={64} color="#DDDDDD" />
           <Text style={styles.emptyTitle}>
@@ -202,6 +347,23 @@ const DashboardScreen = () => {
             style={styles.emptyButton}
             onPress={() => navigation.navigate('Listings' as never)}>
             <Text style={styles.emptyButtonText}>Commencer</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isHost && hostStats?.totalListings === 0 && (
+        <View style={styles.emptyState}>
+          <Ionicons name="home" size={64} color="#DDDDDD" />
+          <Text style={styles.emptyTitle}>
+            Créez votre première annonce
+          </Text>
+          <Text style={styles.emptyText}>
+            Ajoutez votre propriété et commencez à recevoir des réservations!
+          </Text>
+          <TouchableOpacity
+            style={styles.emptyButton}
+            onPress={() => navigation.navigate('CreateListing' as never)}>
+            <Text style={styles.emptyButtonText}>Créer une annonce</Text>
           </TouchableOpacity>
         </View>
       )}

@@ -21,7 +21,7 @@ const ReferralsScreen = () => {
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<string>('all');
+  const [filter, setFilter] = useState<'all' | 'host_confirmed' | 'pending_host_confirmation'>('all');
 
   const fetchReferrals = async () => {
     if (!user?._id) {
@@ -30,8 +30,8 @@ const ReferralsScreen = () => {
       return;
     }
     try {
-      const status = filter === 'all' ? undefined : filter;
-      const data = await referralService.getUserReferrals(user._id, status);
+      const confirmationStatus = filter === 'all' ? undefined : filter;
+      const data = await referralService.getUserReferrals(user._id, undefined, confirmationStatus);
       setReferrals(data || []);
     } catch (error: any) {
       console.error('Failed to fetch referrals:', error);
@@ -61,14 +61,22 @@ const ReferralsScreen = () => {
     Alert.alert('Copié!', 'Lien copié dans le presse-papiers');
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (referral: Referral) => {
+    // Show confirmation status if available, otherwise show referral status
+    const statusToShow = referral.confirmationStatus || referral.status;
+    
     const statusMap: Record<string, {label: string; color: string}> = {
+      // Confirmation statuses
+      host_confirmed: {label: 'Acceptée', color: '#2E7D32'},
+      pending_host_confirmation: {label: 'En attente', color: '#E65100'},
+      host_rejected: {label: 'Rejetée', color: '#C2185B'},
+      // Referral statuses (fallback)
       active: {label: 'Actif', color: '#2E7D32'},
       booked: {label: 'Réservé', color: '#E65100'},
       completed: {label: 'Complété', color: '#1565C0'},
       expired: {label: 'Expiré', color: '#C2185B'},
     };
-    const statusInfo = statusMap[status] || {label: status, color: '#717171'};
+    const statusInfo = statusMap[statusToShow] || {label: statusToShow, color: '#717171'};
     return (
       <View style={[styles.statusBadge, {backgroundColor: statusInfo.color + '20'}]}>
         <Text style={[styles.statusText, {color: statusInfo.color}]}>
@@ -90,20 +98,24 @@ const ReferralsScreen = () => {
     <View style={styles.container}>
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {['all', 'active', 'booked', 'completed'].map(status => (
+          {[
+            { key: 'all', label: 'Tous' },
+            { key: 'host_confirmed', label: 'Acceptées' },
+            { key: 'pending_host_confirmation', label: 'En attente' },
+          ].map(({ key, label }) => (
             <TouchableOpacity
-              key={status}
+              key={key}
               style={[
                 styles.filterTab,
-                filter === status && styles.filterTabActive,
+                filter === key && styles.filterTabActive,
               ]}
-              onPress={() => setFilter(status)}>
+              onPress={() => setFilter(key as any)}>
               <Text
                 style={[
                   styles.filterText,
-                  filter === status && styles.filterTextActive,
+                  filter === key && styles.filterTextActive,
                 ]}>
-                {status === 'all' ? 'Tous' : status === 'active' ? 'Actifs' : status === 'booked' ? 'Réservés' : 'Complétés'}
+                {label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -129,6 +141,13 @@ const ReferralsScreen = () => {
                 Créer une recommandation
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.emptyButton, {marginTop: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FF5A5F'}]}
+              onPress={() => navigation.navigate('MyBookings' as never)}>
+              <Text style={[styles.emptyButtonText, {color: '#FF5A5F'}]}>
+                Voir mes réservations
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : (
           referrals.map(referral => (
@@ -137,27 +156,8 @@ const ReferralsScreen = () => {
                 <Text style={styles.referralCode}>
                   Code: {referral.referralCode}
                 </Text>
-                {getStatusBadge(referral.status)}
+                {getStatusBadge(referral)}
               </View>
-
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Clics</Text>
-                  <Text style={styles.statValue}>{referral.clickCount}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Vues</Text>
-                  <Text style={styles.statValue}>{referral.viewCount}</Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.shareButton}
-                onPress={() =>
-                  navigation.navigate('ReferralShare', {referralId: referral._id} as never)
-                }>
-                <Text style={styles.shareButtonText}>Partager</Text>
-              </TouchableOpacity>
             </View>
           ))
         )}
@@ -234,25 +234,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 20,
-    marginBottom: 15,
-    paddingVertical: 10,
-  },
-  statItem: {
-    flex: 1,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#717171',
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#222222',
   },
   shareButton: {
     backgroundColor: '#FF5A5F',

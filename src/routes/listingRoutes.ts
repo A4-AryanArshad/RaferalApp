@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { ListingService } from '../services/listingService';
+import { cloudbedsService } from '../services/cloudbedsService';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
@@ -22,64 +23,58 @@ router.post(
     body('currency').optional().trim(),
     body('images').optional().isArray(),
     body('amenities').optional().isArray(),
-    body('airbnbListingUrl').optional().trim().custom((value) => {
-      if (!value) return true; // Optional field
-      // Allow any URL format (including YouTube, etc.)
-      try {
-        new URL(value);
-        return true;
-      } catch {
-        return false;
-      }
-    }).withMessage('Invalid URL format'),
+    body('airbnbListingUrl')
+      .optional({ checkFalsy: true })
+      .trim()
+      .isURL()
+      .withMessage('Invalid Airbnb URL'),
   ],
   async (req: AuthRequest, res: Response) => {
     try {
-      console.log('📝 Creating listing...');
-      console.log('Request body keys:', Object.keys(req.body));
-      console.log('Images count:', req.body.images?.length || 0);
-      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        console.error('❌ Validation errors:', errors.array());
         return res.status(400).json({ errors: errors.array() });
       }
 
       if (!req.user) {
-        console.error('❌ Unauthorized: No user in request');
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      console.log('✅ Creating listing for user:', req.user.userId);
+      // Clean up the request body - remove empty strings and convert to undefined
+      const cleanedBody = { ...req.body };
+      if (cleanedBody.airbnbListingUrl === '') {
+        delete cleanedBody.airbnbListingUrl;
+      }
+
+      // Validate and convert pricePerNight to number
+      if (cleanedBody.pricePerNight !== undefined) {
+        const price = parseFloat(cleanedBody.pricePerNight);
+        if (isNaN(price) || price < 0) {
+          return res.status(400).json({ error: 'Invalid price per night' });
+        }
+        cleanedBody.pricePerNight = price;
+      }
+
+      // Ensure hostId is valid
+      if (!req.user?.userId) {
+        return res.status(401).json({ error: 'Invalid user ID' });
+      }
+
       const listing = await ListingService.createListing({
         hostId: req.user.userId,
-        ...req.body,
+        ...cleanedBody,
       });
 
-      console.log('✅ Listing created successfully:', listing._id);
       res.status(201).json({
         message: 'Listing created successfully',
         listing,
       });
     } catch (error: any) {
-      console.error('❌ Error creating listing:', error);
+      console.error('Error creating listing:', error);
       console.error('Error stack:', error.stack);
-      
-      // Provide more specific error messages
-      let statusCode = 500;
-      let errorMessage = 'Failed to create listing';
-      
-      if (error.message) {
-        errorMessage = error.message;
-        // Check if it's a Cloudinary error
-        if (error.message.includes('Cloudinary') || error.message.includes('upload')) {
-          statusCode = 400; // Bad request for upload errors
-        }
-      }
-      
-      res.status(statusCode).json({ 
-        error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      res.status(500).json({ 
+        error: error.message || 'Failed to create listing',
+        details: false ? error.stack : undefined // Hardcoded: no stack traces in production
       });
     }
   }
@@ -101,6 +96,9 @@ router.get(
     query('skip').optional().isInt({ min: 0 }),
   ],
   async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    console.log(`[ListingRoutes] GET /search - Request received`);
+    
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -120,10 +118,16 @@ router.get(
       if (req.query.limit) params.limit = Number(req.query.limit);
       if (req.query.skip) params.skip = Number(req.query.skip);
 
+      console.log(`[ListingRoutes] Calling searchListings with params:`, params);
       const listings = await ListingService.searchListings(params);
+      
+      const totalTime = Date.now() - startTime;
+      console.log(`[ListingRoutes] Search completed in ${totalTime}ms, returning ${listings.length} listings`);
 
       res.json({ listings });
     } catch (error: any) {
+      const totalTime = Date.now() - startTime;
+      console.error(`[ListingRoutes] Error after ${totalTime}ms:`, error.message);
       res.status(500).json({ error: error.message || 'Failed to search listings' });
     }
   }
@@ -141,6 +145,89 @@ router.get('/featured', async (req: Request, res: Response) => {
     res.json({ listings });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Failed to fetch featured listings' });
+  }
+});
+
+/**
+ * GET /api/listings/cloudbeds
+ * Get Cloudbeds properties (protected)
+ */
+router.get('/cloudbeds', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const properties = await cloudbedsService.getProperties();
+
+    res.json({ properties });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to fetch Cloudbeds properties' });
+  }
+});
+
+/**
+ * POST /api/listings/sync-cloudbeds
+ * Sync Cloudbeds properties to listings (protected - admin)
+ */
+router.post('/sync-cloudbeds', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Get Cloudbeds properties
+    const cloudbedsProperties = await cloudbedsService.getProperties();
+    const { Listing } = require('../models/Listing');
+
+    const syncedListings = [];
+
+    for (const property of cloudbedsProperties) {
+      // Check if listing already exists (by property_id stored in airbnbListingUrl or custom field)
+      // For now, we'll use a simple approach - check by title match
+      const existingListing = await Listing.findOne({
+        title: property.property_name,
+        'location.city': property.address.city,
+      });
+
+      if (!existingListing) {
+        // Create listing from Cloudbeds property
+        const listing = new Listing({
+          hostId: req.user.userId, // Assign to current user or system user
+          title: property.property_name,
+          description: property.description || `Beautiful ${property.property_type} in ${property.address.city}`,
+          location: {
+            city: property.address.city,
+            country: property.address.country,
+            address: property.address.address_line_1 || `${property.address.city}, ${property.address.country}`,
+          },
+          coordinates: property.coordinates
+            ? {
+                lat: property.coordinates.latitude,
+                lng: property.coordinates.longitude,
+              }
+            : undefined,
+          pricePerNight: 0, // Will be updated from rates API
+          currency: property.currency || 'USD',
+          images: property.images || [],
+          amenities: property.amenities || [],
+          status: 'active',
+          reviewCount: 0,
+        });
+
+        await listing.save();
+        syncedListings.push(listing);
+      }
+    }
+
+    res.json({
+      message: 'Cloudbeds properties synced successfully',
+      synced: syncedListings.length,
+      total: cloudbedsProperties.length,
+      listings: syncedListings,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to sync Cloudbeds properties' });
   }
 });
 

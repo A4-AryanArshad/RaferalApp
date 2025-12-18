@@ -91,17 +91,83 @@ export class ReferralService {
   }
 
   /**
-   * Get all referrals for a user
+   * Get all referrals for a user (LIGHTWEIGHT)
+   * - Uses lean()
+   * - Does NOT populate listing images
    */
-  static async getUserReferrals(userId: string, status?: string): Promise<IReferral[]> {
+  static async getUserReferrals(
+    userId: string,
+    status?: string,
+    confirmationStatus?: 'pending_host_confirmation' | 'host_confirmed'
+  ): Promise<any[]> {
     const query: any = { userId };
     if (status) {
       query.status = status;
     }
 
-    return Referral.find(query)
+    const startTime = Date.now();
+    console.log(
+      '[ReferralService] getUserReferrals called for userId=',
+      userId,
+      'status=',
+      status,
+      'confirmationStatus=',
+      confirmationStatus
+    );
+
+    const referrals = await Referral.find(query)
       .sort({ createdAt: -1 })
-      .populate('listingId');
+      .select('referralCode referralLink status clickCount viewCount createdAt')
+      .lean()
+      .maxTimeMS(10000)
+      .exec();
+
+    // Get pending confirmations for these referrals
+    const { PendingConfirmation } = require('../models/PendingConfirmation');
+    const referralIds = referrals.map((r: any) => r._id);
+    
+    const confirmationQuery: any = { referralId: { $in: referralIds } };
+    if (confirmationStatus) {
+      confirmationQuery.status = confirmationStatus;
+    }
+    
+    const confirmations = await PendingConfirmation.find(confirmationQuery)
+      .select('referralId status')
+      .lean()
+      .maxTimeMS(10000)
+      .exec();
+    
+    // Create a map of referralId -> confirmation status
+    const confirmationMap = new Map();
+    confirmations.forEach((conf: any) => {
+      const refId = conf.referralId?.toString();
+      if (refId) {
+        confirmationMap.set(refId, conf.status);
+      }
+    });
+    
+    // Add confirmation status to each referral
+    const referralsWithStatus = referrals.map((ref: any) => ({
+      ...ref,
+      confirmationStatus: confirmationMap.get(ref._id.toString()) || null,
+    }));
+    
+    // Filter by confirmation status if specified
+    let filteredReferrals = referralsWithStatus;
+    if (confirmationStatus) {
+      filteredReferrals = referralsWithStatus.filter(
+        (ref: any) => ref.confirmationStatus === confirmationStatus
+      );
+    }
+
+    console.log(
+      '[ReferralService] getUserReferrals completed in',
+      Date.now() - startTime,
+      'ms; count=',
+      filteredReferrals.length
+    );
+
+    return filteredReferrals;
   }
 
   /**
@@ -165,9 +231,35 @@ export class ReferralService {
     referral.checkOutDate = data.checkOut;
     await referral.save();
 
+    // Get listing and host info if listingId exists
+    let listingId = null;
+    let hostId = null;
+    
+    if (referral.listingId) {
+      listingId = referral.listingId;
+      
+      // IMPORTANT PERFORMANCE OPTIMIZATION:
+      // When resolving the host for this referral, we only need hostId.
+      // The Listing document can contain large base64 images, so we:
+      // - Select only hostId
+      // - Use lean()
+      // - Apply a maxTimeMS to fail fast instead of hanging.
+      const Listing = require('../models/Listing').Listing;
+      const listing = await Listing.findById(referral.listingId)
+        .select('hostId')
+        .lean()
+        .maxTimeMS(5000)
+        .exec();
+      if (listing) {
+        hostId = listing.hostId;
+      }
+    }
+
     // Create pending confirmation record
     const confirmation = new PendingConfirmation({
       referralId: referral._id,
+      listingId: listingId || undefined,
+      hostId: hostId || undefined,
       referralCode: data.referralCode,
       guestEmail: data.guestEmail.toLowerCase(),
       bookingConfirmation: data.bookingConfirmation,

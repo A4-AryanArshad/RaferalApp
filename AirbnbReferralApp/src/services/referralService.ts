@@ -15,6 +15,7 @@ export interface Referral {
   checkOutDate?: string;
   createdAt: string;
   updatedAt: string;
+  confirmationStatus?: 'pending_host_confirmation' | 'host_confirmed' | 'host_rejected' | null;
 }
 
 export interface ReferralStats {
@@ -42,9 +43,13 @@ export const referralService = {
     return response.data.referral;
   },
 
-  getUserReferrals: async (userId: string, status?: string): Promise<Referral[]> => {
-    const url = status
-      ? `/referrals/user/${userId}?status=${status}`
+  getUserReferrals: async (userId: string, status?: string, confirmationStatus?: 'pending_host_confirmation' | 'host_confirmed'): Promise<Referral[]> => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (confirmationStatus) params.append('confirmationStatus', confirmationStatus);
+    const queryString = params.toString();
+    const url = queryString
+      ? `/referrals/user/${userId}?${queryString}`
       : `/referrals/user/${userId}`;
     const response = await api.get(url);
     return response.data.referrals;
@@ -79,6 +84,12 @@ export const referralService = {
       ...data,
       reportedBy: 'guest',
     });
+  },
+
+  getMyBookings: async (status?: 'pending_host_confirmation' | 'host_confirmed' | 'host_rejected'): Promise<any[]> => {
+    const params = status ? `?status=${status}` : '';
+    const response = await api.get(`/referrals/my-bookings${params}`);
+    return response.data.confirmations;
   },
 };
 

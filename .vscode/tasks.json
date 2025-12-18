@@ -3,17 +3,15 @@
   "tasks": [
     {
       "label": "Start Backend Server",
-      "type": "shell",
-      "command": "npm run dev",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
+      "type": "npm",
+      "script": "dev",
       "problemMatcher": [],
-      "isBackground": true,
       "presentation": {
         "reveal": "always",
-        "panel": "dedicated",
-        "focus": false
+        "panel": "new",
+        "focus": false,
+        "clear": true,
+        "group": "backend"
       },
       "runOptions": {
         "runOn": "default"
@@ -22,16 +20,17 @@
     {
       "label": "Start Expo App",
       "type": "shell",
-      "command": "npx expo start --ios --localhost",
+      "command": "npx expo start --localhost",
       "options": {
         "cwd": "${workspaceFolder}/AirbnbReferralApp"
       },
       "problemMatcher": [],
-      "isBackground": true,
       "presentation": {
         "reveal": "always",
-        "panel": "dedicated",
-        "focus": false
+        "panel": "new",
+        "focus": false,
+        "clear": true,
+        "group": "mobile"
       },
       "runOptions": {
         "runOn": "default"
@@ -47,27 +46,19 @@
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
-        "panel": "dedicated"
+        "panel": "dedicated",
+        "group": "both"
       }
     },
     {
-      "label": "Start All (Single Command)",
-      "type": "shell",
-      "command": "npm run start:all",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "isBackground": true,
+      "label": "Build Backend",
+      "type": "npm",
+      "script": "build",
+      "problemMatcher": ["$tsc"],
       "presentation": {
         "reveal": "always",
-        "panel": "dedicated",
-        "focus": false
-      },
-      "runOptions": {
-        "runOn": "default"
+        "panel": "shared"
       }
     }
   ]
 }
-

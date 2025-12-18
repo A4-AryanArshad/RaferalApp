@@ -1,12 +1,15 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
+// Environment variables are now hardcoded for APK distribution
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { connectDatabase } from './config/database';
 import userRoutes from './routes/userRoutes';
 import referralRoutes from './routes/referralRoutes';
 import listingRoutes from './routes/listingRoutes';
+import rewardRoutes from './routes/rewardRoutes';
+import paymentRoutes from './routes/paymentRoutes';
+import bookingRoutes from './routes/bookingRoutes';
+import webhookRoutes from './routes/webhookRoutes';
+import hostRoutes from './routes/hostRoutes';
 
 // Hardcoded configuration
 const PORT = 3000;
@@ -17,12 +20,10 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: '*', // Allow all origins for local development
+  origin: CORS_ORIGIN,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-// Increase body size limit for base64 images (50MB)
+// Increase body size limit to handle base64 images (50MB)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -39,6 +40,11 @@ app.get('/health', (req: Request, res: Response) => {
 app.use('/api/users', userRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/listings', listingRoutes);
+app.use('/api/rewards', rewardRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/host', hostRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -50,7 +56,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err);
   res.status(500).json({
     error: 'Internal server error',
-    message: NODE_ENV === 'development' ? err.message : undefined,
+    message: false ? err.message : undefined, // Hardcoded: no error messages in production
   });
 });
 
@@ -60,12 +66,11 @@ const startServer = async () => {
     // Connect to database
     await connectDatabase();
 
-    // Start listening on all interfaces (0.0.0.0) so mobile devices can connect
-    app.listen(PORT, '0.0.0.0', () => {
+    // Start listening
+    app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📝 Environment: ${NODE_ENV}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-      console.log(`📱 Mobile access: http://192.168.1.7:${PORT}/api`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

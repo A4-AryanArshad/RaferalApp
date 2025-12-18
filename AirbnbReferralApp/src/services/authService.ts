@@ -6,6 +6,7 @@ export interface RegisterData {
   firstName: string;
   lastName: string;
   phone?: string;
+  role?: 'user' | 'host';
 }
 
 export interface LoginData {
@@ -20,6 +21,7 @@ export interface User {
   lastName: string;
   phone?: string;
   avatarUrl?: string;
+  role: 'user' | 'host';
   ambassadorTier: 'standard' | 'premium' | 'vip';
   verifiedAt?: string;
 }

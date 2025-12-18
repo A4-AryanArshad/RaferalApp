@@ -2,6 +2,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IPendingConfirmation extends Document {
   referralId: mongoose.Types.ObjectId;
+  listingId?: mongoose.Types.ObjectId;
+  hostId?: mongoose.Types.ObjectId;
   referralCode: string;
   guestEmail: string;
   bookingConfirmation?: string;
@@ -12,6 +14,7 @@ export interface IPendingConfirmation extends Document {
   reportedBy: 'guest' | 'referrer';
   status: 'pending_host_confirmation' | 'host_confirmed' | 'host_rejected';
   hostConfirmedAt?: Date;
+  hostRejectedReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,6 +25,16 @@ const PendingConfirmationSchema: Schema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Referral',
       required: true,
+      index: true,
+    },
+    listingId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Listing',
+      index: true,
+    },
+    hostId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
       index: true,
     },
     referralCode: {
@@ -62,6 +75,10 @@ const PendingConfirmationSchema: Schema = new Schema(
     hostConfirmedAt: {
       type: Date,
     },
+    hostRejectedReason: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,
@@ -70,6 +87,8 @@ const PendingConfirmationSchema: Schema = new Schema(
 
 // Indexes
 PendingConfirmationSchema.index({ referralId: 1 });
+PendingConfirmationSchema.index({ listingId: 1 });
+PendingConfirmationSchema.index({ hostId: 1, status: 1 });
 PendingConfirmationSchema.index({ referralCode: 1 });
 PendingConfirmationSchema.index({ status: 1 });
 

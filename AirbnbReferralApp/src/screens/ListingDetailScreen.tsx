@@ -136,13 +136,23 @@ const ListingDetailScreen = () => {
     
     setGenerating(true);
     try {
-      // Create referral without baseUrl - backend will use default
-      const newReferral = await referralService.createReferral({
-        listingId: listing._id,
-        // baseUrl is optional - backend will use default
-      });
-      // Set the referral so it displays immediately
-      setReferral(newReferral);
+      // Check if referral already exists, otherwise create one
+      let referralToUse = referral;
+      
+      if (!referralToUse) {
+        // Create referral without baseUrl - backend will use default
+        referralToUse = await referralService.createReferral({
+          listingId: listing._id,
+          // baseUrl is optional - backend will use default
+        });
+      }
+      
+      // Navigate directly to ReferralShare screen
+      if (referralToUse?._id) {
+        navigation.navigate('ReferralShare', {referralId: referralToUse._id} as never);
+      } else {
+        Alert.alert('Erreur', 'Impossible de créer le lien de recommandation');
+      }
     } catch (error: any) {
       console.error('Error creating referral:', error);
       
@@ -359,18 +369,18 @@ const ListingDetailScreen = () => {
           </TouchableOpacity>
         )}
 
-        {!referral && (
-          <TouchableOpacity
-            style={[styles.button, generating && styles.buttonDisabled]}
-            onPress={handleGenerateReferral}
-            disabled={generating}>
-            {generating ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Créer un lien de recommandation</Text>
-            )}
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[styles.button, generating && styles.buttonDisabled]}
+          onPress={referral ? () => navigation.navigate('ReferralShare', {referralId: referral._id} as never) : handleGenerateReferral}
+          disabled={generating}>
+          {generating ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {referral ? 'Partager le lien' : 'Créer un lien de recommandation'}
+            </Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       {referral && (

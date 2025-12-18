@@ -3,7 +3,7 @@ import {createStackNavigator} from '@react-navigation/stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {getGlobalUser, subscribeToUser} from '../store/authStore';
 import {User} from '../services/authService';
-import {ActivityIndicator, View, Text, StyleSheet} from 'react-native';
+import {ActivityIndicator, View, Text, StyleSheet, Image} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 
 // Auth Screens
@@ -21,13 +21,20 @@ import ReferralShareScreen from '../screens/ReferralShareScreen';
 import CreateListingScreen from '../screens/CreateListingScreen';
 import ReferralLandingScreen from '../screens/ReferralLandingScreen';
 import ReportBookingScreen from '../screens/ReportBookingScreen';
+import MyBookingsScreen from '../screens/MyBookingsScreen';
+import HostConfirmationsScreen from '../screens/HostConfirmationsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const LoadingScreen = () => (
   <View style={styles.loadingContainer}>
-    <ActivityIndicator size="large" color="#FF5A5F" />
+    <Image 
+      source={require('../../assets/logo.jpeg')} 
+      style={styles.logo}
+      resizeMode="contain"
+    />
+    <ActivityIndicator size="large" color="#FF5A5F" style={styles.spinner} />
     <Text style={styles.loadingText}>Loading...</Text>
   </View>
 );
@@ -210,6 +217,26 @@ const AppNavigator = () => {
           headerTintColor: '#222222',
         }}
       />
+      <Stack.Screen
+        name="MyBookings"
+        component={MyBookingsScreen}
+        options={{
+          headerShown: true as boolean,
+          title: 'Mes réservations',
+          headerStyle: {backgroundColor: '#FFFFFF'},
+          headerTintColor: '#222222',
+        }}
+      />
+      <Stack.Screen
+        name="HostConfirmations"
+        component={HostConfirmationsScreen}
+        options={{
+          headerShown: true as boolean,
+          title: 'Confirmations en attente',
+          headerStyle: {backgroundColor: '#FFFFFF'},
+          headerTintColor: '#222222',
+        }}
+      />
       {/* Public screens - accessible without auth */}
       <Stack.Screen
         name="ReferralLanding"
@@ -230,11 +257,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F7F7F7',
+    backgroundColor: '#FFFFFF',
+  },
+  logo: {
+    width: 200,
+    height: 200,
+    marginBottom: 20,
+  },
+  spinner: {
+    marginTop: 10,
   },
   loadingText: {
     marginTop: 10,
     color: '#717171',
+    fontSize: 16,
   },
 });
 

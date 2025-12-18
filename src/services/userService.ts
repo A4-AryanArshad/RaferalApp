@@ -7,6 +7,7 @@ export interface RegisterData {
   firstName: string;
   lastName: string;
   phone?: string;
+  role?: 'user' | 'host';
 }
 
 export interface LoginData {
@@ -42,6 +43,7 @@ export class UserService {
       firstName: data.firstName,
       lastName: data.lastName,
       phone: data.phone,
+      role: data.role || 'user',
       ambassadorTier: 'standard',
     });
 

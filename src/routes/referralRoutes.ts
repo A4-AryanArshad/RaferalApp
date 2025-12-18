@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { body, param, validationResult } from 'express-validator';
+import { body, param, query, validationResult } from 'express-validator';
 import { ReferralService } from '../services/referralService';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { Referral } from '../models/Referral';
@@ -145,11 +145,12 @@ router.get(
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      const { status } = req.query;
+      const { status, confirmationStatus } = req.query;
 
       const referrals = await ReferralService.getUserReferrals(
         req.params.userId,
-        status as string
+        status as string,
+        confirmationStatus as 'pending_host_confirmation' | 'host_confirmed' | undefined
       );
 
       res.json({ referrals });
@@ -315,11 +316,13 @@ router.get(
 
 /**
  * POST /api/referrals/track-booking
- * Track booking (protected - can be called by referrer or guest)
+ * Track booking (PUBLIC - can be called by guest or referrer).
+ *
+ * If a user token is present and reportedBy === 'referrer', we verify ownership.
+ * Otherwise, booking can be reported anonymously as a guest using the referral code.
  */
 router.post(
   '/track-booking',
-  authenticate,
   [
     body('referralCode').trim().notEmpty().withMessage('Referral code is required'),
     body('guestEmail').isEmail().normalizeEmail(),
@@ -327,6 +330,68 @@ router.post(
     body('checkOut').isISO8601().toDate(),
     body('bookingConfirmation').optional().trim(),
     body('reportedBy').isIn(['guest', 'referrer']),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      console.log('[ReferralRoutes] POST /track-booking - body:', {
+        referralCode: req.body.referralCode,
+        guestEmail: req.body.guestEmail,
+        checkIn: req.body.checkIn,
+        checkOut: req.body.checkOut,
+        reportedBy: req.body.reportedBy,
+      });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        console.warn('[ReferralRoutes] Validation failed for /track-booking:', errors.array());
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { referralCode, guestEmail, bookingConfirmation, checkIn, checkOut, reportedBy } = req.body;
+
+      // If reported by referrer AND we have an authenticated user, verify they own the referral
+      if (reportedBy === 'referrer' && req.user) {
+        const referral = await Referral.findOne({ referralCode });
+        if (!referral || referral.userId.toString() !== req.user.userId) {
+          return res.status(403).json({ error: 'You can only report bookings for your own referrals' });
+        }
+      }
+
+      console.log('[ReferralRoutes] Calling ReferralService.trackBooking');
+      const result = await ReferralService.trackBooking({
+        referralCode,
+        guestEmail,
+        bookingConfirmation,
+        checkIn: new Date(checkIn),
+        checkOut: new Date(checkOut),
+        reportedBy,
+      });
+
+      console.log('[ReferralRoutes] trackBooking succeeded, confirmationId:', result.confirmation._id.toString());
+
+      res.status(201).json({
+        message: 'Booking reported successfully. Waiting for host confirmation.',
+        referral: result.referral,
+        confirmation: result.confirmation,
+      });
+    } catch (error: any) {
+      console.error('[ReferralRoutes] Error in /track-booking:', error);
+      res.status(400).json({ error: error.message || 'Failed to track booking' });
+    }
+  }
+);
+
+/**
+ * GET /api/referrals/my-bookings
+ * Get bookings reported by current user (protected)
+ */
+router.get(
+  '/my-bookings',
+  authenticate,
+  [
+    query('status')
+      .optional()
+      .isIn(['pending_host_confirmation', 'host_confirmed', 'host_rejected']),
   ],
   async (req: AuthRequest, res: Response) => {
     try {
@@ -339,24 +404,35 @@ router.post(
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const { referralCode, guestEmail, bookingConfirmation, checkIn, checkOut, reportedBy } = req.body;
+      const { PendingConfirmation } = require('../models/PendingConfirmation');
+      const { Referral } = require('../models/Referral');
 
-      const result = await ReferralService.trackBooking({
-        referralCode,
-        guestEmail,
-        bookingConfirmation,
-        checkIn: new Date(checkIn),
-        checkOut: new Date(checkOut),
-        reportedBy,
-      });
+      // Get user's referrals
+      const userReferrals = await Referral.find({ userId: req.user.userId });
+      const referralIds = userReferrals.map((r: any) => r._id);
 
-      res.status(201).json({
-        message: 'Booking tracked successfully',
-        referral: result.referral,
-        confirmation: result.confirmation,
-      });
+      const bookingQuery: any = {
+        referralId: { $in: referralIds },
+      };
+      if (req.query.status) {
+        bookingQuery.status = req.query.status;
+      }
+
+      // Get confirmations where user reported the booking (lean, lightweight listing info)
+      const confirmations = await PendingConfirmation.find(bookingQuery)
+        .sort({ createdAt: -1 })
+        .populate({
+          path: 'listingId',
+          select: 'title location.city location.country',
+        })
+        .lean()
+        .exec();
+
+      res.json({ confirmations });
     } catch (error: any) {
-      res.status(400).json({ error: error.message || 'Failed to track booking' });
+      res
+        .status(500)
+        .json({ error: error.message || 'Failed to fetch bookings' });
     }
   }
 );

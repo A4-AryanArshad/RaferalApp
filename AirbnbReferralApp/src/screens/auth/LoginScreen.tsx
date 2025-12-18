@@ -13,29 +13,72 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useAuth} from '../../contexts/AuthContext';
+import {authService} from '../../services/authService';
+import {Ionicons} from '@expo/vector-icons';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'user' | 'host' | null>(null);
   const [loading, setLoading] = useState(false);
   const {login} = useAuth();
   const navigation = useNavigation();
 
-  const handleLogin = async () => {
+  const handleLogin = async (role: 'user' | 'host') => {
     if (!email || !password) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
 
+    if (!selectedRole) {
+      Alert.alert('Erreur', 'Veuillez sélectionner un type de connexion');
+      return;
+    }
+
     setLoading(true);
     try {
+      // Login first
       await login(email, password);
+      
+      // Wait a moment for auth context to update
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Get user profile to verify role
+      const userProfile = await authService.getProfile();
+      
+      if (userProfile) {
+        if (role === 'host' && userProfile.role !== 'host') {
+          // Logout the user - wrong role
+          const {logout} = useAuth();
+          await logout();
+          Alert.alert(
+            'Erreur',
+            'Ce compte n\'est pas un compte hôte. Veuillez vous connecter en tant qu\'utilisateur.'
+          );
+          setLoading(false);
+          return;
+        }
+        
+        if (role === 'user' && userProfile.role !== 'user') {
+          // Logout the user - wrong role
+          const {logout} = useAuth();
+          await logout();
+          Alert.alert(
+            'Erreur',
+            'Ce compte est un compte hôte. Veuillez vous connecter en tant qu\'hôte.'
+          );
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Role matches, login successful - navigation handled by auth context
     } catch (error: any) {
       let errorMessage = 'Échec de la connexion';
       
       // Handle network errors
       if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
-        errorMessage = 'Impossible de se connecter au serveur. Vérifiez votre connexion réseau (backend déployé : https://raferal-app-pqbq.vercel.app/api)';
+        errorMessage = 'Impossible de se connecter au serveur. Vérifiez que le backend est démarré sur http://localhost:3000';
       } else if (error.response?.data) {
         if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
           errorMessage = error.response.data.errors
@@ -86,10 +129,60 @@ const LoginScreen = () => {
             editable={!loading}
           />
 
+          {/* Login Type Selection */}
+          <Text style={styles.roleLabel}>Je me connecte en tant que:</Text>
+          <View style={styles.roleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.roleButton,
+                selectedRole === 'user' && styles.roleButtonActive,
+              ]}
+              onPress={() => setSelectedRole('user')}
+              disabled={loading}>
+              <Ionicons
+                name="person-outline"
+                size={24}
+                color={selectedRole === 'user' ? '#FF5A5F' : '#717171'}
+                style={styles.roleIcon}
+              />
+              <Text
+                style={[
+                  styles.roleButtonText,
+                  selectedRole === 'user' && styles.roleButtonTextActive,
+                ]}>
+                Voyageur
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.roleButton,
+                selectedRole === 'host' && styles.roleButtonActive,
+              ]}
+              onPress={() => setSelectedRole('host')}
+              disabled={loading}>
+              <Ionicons
+                name="home-outline"
+                size={24}
+                color={selectedRole === 'host' ? '#FF5A5F' : '#717171'}
+                style={styles.roleIcon}
+              />
+              <Text
+                style={[
+                  styles.roleButtonText,
+                  selectedRole === 'host' && styles.roleButtonTextActive,
+                ]}>
+                Hôte
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}>
+            style={[
+              styles.button,
+              (loading || !selectedRole) && styles.buttonDisabled,
+            ]}
+            onPress={() => selectedRole && handleLogin(selectedRole)}
+            disabled={loading || !selectedRole}>
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -167,6 +260,46 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#FF5A5F',
     fontSize: 14,
+  },
+  roleLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#222222',
+    marginBottom: 10,
+    marginTop: 5,
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 15,
+  },
+  roleButton: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#DDDDDD',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  roleButtonActive: {
+    borderColor: '#FF5A5F',
+    backgroundColor: '#FFF5F5',
+  },
+  roleIcon: {
+    marginRight: 4,
+  },
+  roleButtonText: {
+    fontSize: 16,
+    color: '#717171',
+    fontWeight: '500',
+  },
+  roleButtonTextActive: {
+    color: '#FF5A5F',
+    fontWeight: '600',
   },
 });
 

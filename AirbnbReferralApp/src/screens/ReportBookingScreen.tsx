@@ -138,7 +138,7 @@ const ReportBookingScreen = () => {
             value={formData.referralCode}
             onChangeText={value => handleChange('referralCode', value.toUpperCase())}
             autoCapitalize="characters"
-            editable={loading === false && (referralCode === undefined || referralCode === '') ? true : false}
+            editable={!loading}
             placeholderTextColor="#999"
           />
 

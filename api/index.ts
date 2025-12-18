@@ -1,31 +1,23 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-// Load environment variables (Vercel provides these automatically, but dotenv helps for local testing)
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  try {
-    require('dotenv').config();
-  } catch (e) {
-    // dotenv not available, using Vercel env vars
-  }
-}
-
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import { connectDatabase } from '../src/config/database';
 import userRoutes from '../src/routes/userRoutes';
 import referralRoutes from '../src/routes/referralRoutes';
 import listingRoutes from '../src/routes/listingRoutes';
-import express, { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
 
-// Create Express app
 const app = express();
+
+// Hardcoded configuration
+const CORS_ORIGIN = '*'; // Allow all origins
+const NODE_ENV = 'production';
 
 // Middleware
 app.use(cors({
-  origin: '*',
+  origin: CORS_ORIGIN,
   credentials: true,
 }));
-// Increase body size limit for base64 images (50MB)
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
@@ -44,7 +36,7 @@ app.use('/api/listings', listingRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: 'Route not found', path: req.path });
+  res.status(404).json({ error: 'Route not found' });
 });
 
 // Error handler
@@ -52,32 +44,21 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err);
   res.status(500).json({
     error: 'Internal server error',
+    message: undefined, // Don't expose error details in production
   });
 });
 
-// Database connection cache
-let dbConnected = false;
-
 // Export serverless handler for Vercel
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Set JSON content type
-  res.setHeader('Content-Type', 'application/json');
-  
+export default async function handler(req: Request, res: Response) {
   try {
     // Connect to database (connection is cached)
-    if (!dbConnected) {
-      await connectDatabase();
-      dbConnected = true;
-    }
+    await connectDatabase();
     
-    // Convert Vercel request/response to Express format
-    const expressReq = req as unknown as Request;
-    const expressRes = res as unknown as Response;
-    
-    // Handle the request with Express app
-    app(expressReq, expressRes);
+    // Handle the request
+    return app(req, res);
   } catch (error) {
     console.error('Handler error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+

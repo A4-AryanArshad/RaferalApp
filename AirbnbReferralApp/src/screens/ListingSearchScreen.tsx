@@ -11,7 +11,8 @@ import {
   RefreshControl,
   Image,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import {useCallback} from 'react';
 import {referralService} from '../services/referralService';
 import {listingService, Listing} from '../services/listingService';
 import {Ionicons} from '@expo/vector-icons';
@@ -25,6 +26,7 @@ const ListingSearchScreen = () => {
 
   const fetchListings = async () => {
     try {
+      setLoading(true);
       const params: any = {
         limit: 50, // Load more listings
       };
@@ -32,11 +34,24 @@ const ListingSearchScreen = () => {
         params.city = searchQuery;
       }
       // If no search query, fetch all active listings
+      console.log('[ListingSearch] Fetching listings with params:', params);
       const data = await listingService.searchListings(params);
+      console.log(`[ListingSearch] Received ${data.length} listings`);
       setListings(data);
-    } catch (error) {
-      console.error('Failed to fetch listings:', error);
-      Alert.alert('Erreur', 'Impossible de charger les annonces');
+    } catch (error: any) {
+      console.error('[ListingSearch] Failed to fetch listings:', error);
+      console.error('[ListingSearch] Error details:', error.response?.data || error.message);
+      
+      // Don't show alert for timeout - just log it
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        console.warn('[ListingSearch] Request timed out - this might be a server issue');
+        // Set empty listings instead of showing error
+        setListings([]);
+      } else {
+        // For other errors, show alert
+        Alert.alert('Erreur', 'Impossible de charger les annonces. Veuillez réessayer.');
+        setListings([]);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -46,6 +61,13 @@ const ListingSearchScreen = () => {
   useEffect(() => {
     fetchListings();
   }, []);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchListings();
+    }, [])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

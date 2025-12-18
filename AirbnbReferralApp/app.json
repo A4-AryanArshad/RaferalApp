@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "AirbnbReferralApp",
-    "slug": "AirbnbReferralApp",
-    "version": "1.0.0",
+    "name": "goodeel",
+    "slug": "goodeel",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.airbnbreferral.app",
+      "bundleIdentifier": "com.goodeel.app",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select images for listings.",
         "NSPhotoLibraryAddUsageDescription": "This app needs access to save images to your photo library."
@@ -24,7 +24,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.airbnbreferral.app",
+      "package": "com.goodeel.app",
       "permissions": [
         "INTERNET",
         "READ_EXTERNAL_STORAGE",
@@ -40,7 +40,12 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "airbnbreferral",
+    "scheme": "goodeel",
+    "plugins": [],
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
     "extra": {
       "eas": {
         "projectId": "de5de2dc-eb26-461a-8554-63f30f5679ce"

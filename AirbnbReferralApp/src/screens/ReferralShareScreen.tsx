@@ -154,17 +154,6 @@ const ReferralShareScreen = () => {
             </Text>
           )}
         </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{referral.clickCount}</Text>
-            <Text style={styles.statLabel}>Clics</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{referral.viewCount}</Text>
-            <Text style={styles.statLabel}>Vues</Text>
-          </View>
-        </View>
       </View>
 
       <View style={styles.shareSection}>
@@ -299,26 +288,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#DDDDDD',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#222222',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#717171',
   },
   shareSection: {
     backgroundColor: '#FFFFFF',

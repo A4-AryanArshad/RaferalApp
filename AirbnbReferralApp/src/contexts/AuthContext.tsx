@@ -13,6 +13,7 @@ interface AuthContextType {
     firstName: string;
     lastName: string;
     phone?: string;
+    role?: 'user' | 'host';
   }) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => Promise<void>;
@@ -111,6 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({children}) => {
     firstName: string;
     lastName: string;
     phone?: string;
+    role?: 'user' | 'host';
   }) => {
     const response = await authService.register(data);
     await AsyncStorage.setItem('accessToken', response.accessToken);

@@ -17,6 +17,7 @@ router.post(
     body('firstName').trim().notEmpty().withMessage('First name is required'),
     body('lastName').trim().notEmpty().withMessage('Last name is required'),
     body('phone').optional().trim(),
+    body('role').optional().isIn(['user', 'host']).withMessage('Role must be either user or host'),
   ],
   async (req: Request, res: Response) => {
     try {
@@ -28,7 +29,7 @@ router.post(
         });
       }
 
-      const { email, password, firstName, lastName, phone } = req.body;
+      const { email, password, firstName, lastName, phone, role } = req.body;
 
       const result = await UserService.register({
         email,
@@ -36,6 +37,7 @@ router.post(
         firstName,
         lastName,
         phone,
+        role: role || 'user',
       });
 
       res.status(201).json({
