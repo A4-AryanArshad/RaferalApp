@@ -25,6 +25,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.goodeel.app",
+      "versionCode": 1,
       "permissions": [
         "INTERNET",
         "READ_EXTERNAL_STORAGE",
@@ -33,7 +34,6 @@
         "READ_MEDIA_IMAGES"
       ],
       "jsEngine": "hermes",
-      "usesCleartextTraffic": false,
       "allowBackup": true
     },
     "jsEngine": "hermes",
@@ -48,7 +48,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "de5de2dc-eb26-461a-8554-63f30f5679ce"
+        "projectId": "93eb3822-239c-4c37-8532-589b2a9ec732"
       }
     }
   }

@@ -51,7 +51,9 @@ export const referralService = {
     const url = queryString
       ? `/referrals/user/${userId}?${queryString}`
       : `/referrals/user/${userId}`;
+    console.log('[ReferralService] Fetching referrals from:', url);
     const response = await api.get(url);
+    console.log('[ReferralService] Received referrals:', response.data.referrals?.length || 0);
     return response.data.referrals;
   },
 

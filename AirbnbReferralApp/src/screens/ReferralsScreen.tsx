@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ const ReferralsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'host_confirmed' | 'pending_host_confirmation'>('all');
 
-  const fetchReferrals = async () => {
+  const fetchReferrals = useCallback(async () => {
     if (!user?._id) {
       setLoading(false);
       setRefreshing(false);
@@ -31,10 +31,21 @@ const ReferralsScreen = () => {
     }
     try {
       const confirmationStatus = filter === 'all' ? undefined : filter;
+      console.log('[ReferralsScreen] Fetching referrals with filter:', filter, 'confirmationStatus:', confirmationStatus);
       const data = await referralService.getUserReferrals(user._id, undefined, confirmationStatus);
+      console.log('[ReferralsScreen] Received referrals:', data?.length || 0);
+      // Debug: Log first referral's confirmationStatus
+      if (data && data.length > 0) {
+        console.log('[ReferralsScreen] First referral sample:', {
+          referralCode: data[0].referralCode,
+          status: data[0].status,
+          confirmationStatus: data[0].confirmationStatus
+        });
+      }
       setReferrals(data || []);
     } catch (error: any) {
-      console.error('Failed to fetch referrals:', error);
+      console.error('[ReferralsScreen] Failed to fetch referrals:', error);
+      console.error('[ReferralsScreen] Error details:', error.response?.data || error.message);
       // Set empty array on error instead of crashing
       setReferrals([]);
       // Only show alert for non-404 errors (404 means no referrals, which is fine)
@@ -45,11 +56,12 @@ const ReferralsScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [filter, user?._id]);
 
   useEffect(() => {
+    console.log('[ReferralsScreen] useEffect triggered, filter:', filter, 'user:', user?._id);
     fetchReferrals();
-  }, [filter, user]);
+  }, [fetchReferrals]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -62,11 +74,24 @@ const ReferralsScreen = () => {
   };
 
   const getStatusBadge = (referral: Referral) => {
-    // Show confirmation status if available, otherwise show referral status
-    const statusToShow = referral.confirmationStatus || referral.status;
+    // When filtering, prioritize confirmation status
+    // If filter is active and referral has confirmation status, show that
+    // Otherwise show referral status
+    let statusToShow: string;
+    
+    if (filter !== 'all' && referral.confirmationStatus) {
+      // When filtering by confirmation status, show confirmation status
+      statusToShow = referral.confirmationStatus;
+    } else if (referral.confirmationStatus) {
+      // If referral has confirmation status, show it
+      statusToShow = referral.confirmationStatus;
+    } else {
+      // Fallback to referral status
+      statusToShow = referral.status;
+    }
     
     const statusMap: Record<string, {label: string; color: string}> = {
-      // Confirmation statuses
+      // Confirmation statuses (priority)
       host_confirmed: {label: 'Acceptée', color: '#2E7D32'},
       pending_host_confirmation: {label: 'En attente', color: '#E65100'},
       host_rejected: {label: 'Rejetée', color: '#C2185B'},
@@ -94,6 +119,10 @@ const ReferralsScreen = () => {
     );
   }
 
+  // Debug: Log current filter
+  console.log('[ReferralsScreen] Current filter:', filter);
+  console.log('[ReferralsScreen] Referrals count:', referrals.length);
+
   return (
     <View style={styles.container}>
       <View style={styles.filterContainer}>
@@ -109,7 +138,10 @@ const ReferralsScreen = () => {
                 styles.filterTab,
                 filter === key && styles.filterTabActive,
               ]}
-              onPress={() => setFilter(key as any)}>
+              onPress={() => {
+                console.log('[ReferralsScreen] Filter button pressed:', key);
+                setFilter(key as any);
+              }}>
               <Text
                 style={[
                   styles.filterText,

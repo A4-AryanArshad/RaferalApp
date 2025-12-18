@@ -21,7 +21,7 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<'user' | 'host' | null>(null);
   const [loading, setLoading] = useState(false);
-  const {login} = useAuth();
+  const {login, logout} = useAuth();
   const navigation = useNavigation();
 
   const handleLogin = async (role: 'user' | 'host') => {
@@ -46,33 +46,9 @@ const LoginScreen = () => {
       // Get user profile to verify role
       const userProfile = await authService.getProfile();
       
-      if (userProfile) {
-        if (role === 'host' && userProfile.role !== 'host') {
-          // Logout the user - wrong role
-          const {logout} = useAuth();
-          await logout();
-          Alert.alert(
-            'Erreur',
-            'Ce compte n\'est pas un compte hôte. Veuillez vous connecter en tant qu\'utilisateur.'
-          );
-          setLoading(false);
-          return;
-        }
-        
-        if (role === 'user' && userProfile.role !== 'user') {
-          // Logout the user - wrong role
-          const {logout} = useAuth();
-          await logout();
-          Alert.alert(
-            'Erreur',
-            'Ce compte est un compte hôte. Veuillez vous connecter en tant qu\'hôte.'
-          );
-          setLoading(false);
-          return;
-        }
-      }
-      
-      // Role matches, login successful - navigation handled by auth context
+      // Login successful - navigation will be handled by auth context based on actual user role
+      // The role selection button is just for UI, actual navigation is based on user.role from backend
+      // No need to check role mismatch - let the app navigate to the correct screen based on actual role
     } catch (error: any) {
       let errorMessage = 'Échec de la connexion';
       

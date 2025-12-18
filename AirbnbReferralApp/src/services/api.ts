@@ -2,9 +2,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Base URL Configuration - Hardcoded for APK distribution
-// For production APK, use your server URL (replace with your actual server URL)
-// Example: 'https://your-server.com/api' or 'http://your-ip:3000/api'
-const API_BASE_URL = 'http://localhost:3000/api';  // TODO: Replace with your production server URL before building APK
+// Using deployed production server
+const API_BASE_URL = 'https://raferal-app-pqbq.vercel.app/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

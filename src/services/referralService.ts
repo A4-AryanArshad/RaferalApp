@@ -115,6 +115,75 @@ export class ReferralService {
       confirmationStatus
     );
 
+    const { PendingConfirmation } = require('../models/PendingConfirmation');
+    const mongoose = require('mongoose');
+
+    let referralIds: any[] = [];
+
+    // If filtering by confirmation status, first get the referral IDs from confirmations
+    if (confirmationStatus) {
+      console.log(`[ReferralService] Filtering by confirmationStatus=${confirmationStatus}, getting referral IDs from confirmations first`);
+      
+      // Get all confirmations with the specified status for this user's referrals
+      // First, get all user referrals to find their IDs
+      const allUserReferrals = await Referral.find(query)
+        .select('_id')
+        .lean()
+        .maxTimeMS(5000)
+        .exec();
+      
+      const allReferralIds = allUserReferrals.map((r: any) => {
+        if (r._id instanceof mongoose.Types.ObjectId) {
+          return r._id;
+        }
+        return new mongoose.Types.ObjectId(r._id);
+      });
+      
+      // Get confirmations with the specified status for these referrals
+      const confirmations = await PendingConfirmation.find({
+        referralId: { $in: allReferralIds },
+        status: confirmationStatus
+      })
+        .select('referralId')
+        .lean()
+        .maxTimeMS(10000)
+        .exec();
+      
+      console.log(`[ReferralService] Found ${confirmations.length} confirmations with status=${confirmationStatus}`);
+      
+      // Extract unique referral IDs from confirmations
+      const confirmedReferralIds = new Set<string>();
+      confirmations.forEach((conf: any) => {
+        let refId: string | null = null;
+        if (conf.referralId) {
+          if (conf.referralId instanceof mongoose.Types.ObjectId) {
+            refId = conf.referralId.toString();
+          } else if (typeof conf.referralId === 'object' && conf.referralId.toString) {
+            refId = conf.referralId.toString();
+          } else if (typeof conf.referralId === 'string') {
+            refId = conf.referralId;
+          }
+        }
+        if (refId) {
+          confirmedReferralIds.add(refId);
+        }
+      });
+      
+      // Convert back to ObjectIds for the query
+      referralIds = Array.from(confirmedReferralIds).map(id => new mongoose.Types.ObjectId(id));
+      console.log(`[ReferralService] Filtering to ${referralIds.length} referrals that have confirmations with status=${confirmationStatus}`);
+      
+      // Update query to only include these referral IDs
+      if (referralIds.length === 0) {
+        // No referrals match, return empty array
+        console.log(`[ReferralService] No referrals found with confirmationStatus=${confirmationStatus}`);
+        return [];
+      }
+      
+      query._id = { $in: referralIds };
+    }
+
+    // Get referrals (either all or filtered by confirmation status)
     const referrals = await Referral.find(query)
       .sort({ createdAt: -1 })
       .select('referralCode referralLink status clickCount viewCount createdAt')
@@ -122,52 +191,65 @@ export class ReferralService {
       .maxTimeMS(10000)
       .exec();
 
-    // Get pending confirmations for these referrals
-    const { PendingConfirmation } = require('../models/PendingConfirmation');
-    const referralIds = referrals.map((r: any) => r._id);
+    console.log(`[ReferralService] Found ${referrals.length} referrals`);
+
+    // Get all confirmations for these referrals to add confirmationStatus
+    const referralIdsForConfirmations = referrals.map((r: any) => {
+      if (r._id instanceof mongoose.Types.ObjectId) {
+        return r._id;
+      }
+      return new mongoose.Types.ObjectId(r._id);
+    });
     
-    const confirmationQuery: any = { referralId: { $in: referralIds } };
-    if (confirmationStatus) {
-      confirmationQuery.status = confirmationStatus;
-    }
-    
-    const confirmations = await PendingConfirmation.find(confirmationQuery)
+    const confirmations = await PendingConfirmation.find({
+      referralId: { $in: referralIdsForConfirmations }
+    })
       .select('referralId status')
       .lean()
       .maxTimeMS(10000)
       .exec();
     
-    // Create a map of referralId -> confirmation status
-    const confirmationMap = new Map();
+    console.log(`[ReferralService] Found ${confirmations.length} total confirmations for these referrals`);
+    
+    // Create a map of referralId (as string) -> confirmation status
+    const confirmationMap = new Map<string, string>();
     confirmations.forEach((conf: any) => {
-      const refId = conf.referralId?.toString();
+      let refId: string | null = null;
+      if (conf.referralId) {
+        if (conf.referralId instanceof mongoose.Types.ObjectId) {
+          refId = conf.referralId.toString();
+        } else if (typeof conf.referralId === 'object' && conf.referralId.toString) {
+          refId = conf.referralId.toString();
+        } else if (typeof conf.referralId === 'string') {
+          refId = conf.referralId;
+        }
+      }
       if (refId) {
         confirmationMap.set(refId, conf.status);
       }
     });
     
     // Add confirmation status to each referral
-    const referralsWithStatus = referrals.map((ref: any) => ({
-      ...ref,
-      confirmationStatus: confirmationMap.get(ref._id.toString()) || null,
-    }));
+    const referralsWithStatus = referrals.map((ref: any) => {
+      const refId = ref._id instanceof mongoose.Types.ObjectId 
+        ? ref._id.toString() 
+        : String(ref._id);
+      const confStatus = confirmationMap.get(refId) || null;
+      return {
+        ...ref,
+        confirmationStatus: confStatus,
+      };
+    });
     
-    // Filter by confirmation status if specified
-    let filteredReferrals = referralsWithStatus;
-    if (confirmationStatus) {
-      filteredReferrals = referralsWithStatus.filter(
-        (ref: any) => ref.confirmationStatus === confirmationStatus
-      );
-    }
-
+    const totalTime = Date.now() - startTime;
     console.log(
       '[ReferralService] getUserReferrals completed in',
-      Date.now() - startTime,
+      totalTime,
       'ms; count=',
-      filteredReferrals.length
+      referralsWithStatus.length
     );
-
-    return filteredReferrals;
+    
+    return referralsWithStatus;
   }
 
   /**
